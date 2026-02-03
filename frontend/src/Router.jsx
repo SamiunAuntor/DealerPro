@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import MainLayout from "./Layouts/MainLayout";
+import Error404Page from "./Pages/Error404Page";
 
 
 
@@ -33,7 +34,7 @@ const router = createBrowserRouter([
 
     {
         path: "*",
-        element: <h1>404 Page Not Found</h1>
+        element: <Error404Page></Error404Page>
     }
 ])
 
