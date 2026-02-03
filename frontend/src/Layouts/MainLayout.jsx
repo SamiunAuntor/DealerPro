@@ -9,21 +9,21 @@ import {
     X
 } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
+import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
 
 const MainLayout = ({ children }) => {
 
     const [isOpen, setIsOpen] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-
     const navItems = [
-        { name: 'Home', icon: <LayoutGrid size={18} />, href: '/' },
-        { name: 'Inventory', icon: <Package size={18} />, href: '/inventory' },
-        { name: 'Customers', icon: <Users size={18} />, href: '/customers' },
-        { name: 'Company Due', icon: <Wallet size={18} />, href: '/company-due' },
-        { name: 'Analytics', icon: <BarChart3 size={18} />, href: '/analytics' },
+        { name: 'Home', icon: <LayoutGrid size={22} />, href: '/' },
+        { name: 'Inventory', icon: <Package size={22} />, href: '/inventory' },
+        { name: 'Customers', icon: <Users size={22} />, href: '/customers' },
+        { name: 'Company Due', icon: <Wallet size={22} />, href: '/company-due' },
+        { name: 'Analytics', icon: <BarChart3 size={22} />, href: '/analytics' },
     ];
-
 
     const formatDate = (date) => date.toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric'
@@ -35,84 +35,81 @@ const MainLayout = ({ children }) => {
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer); // Cleanup on unmount
+        return () => clearInterval(timer);
     }, []);
 
     return (
         <div className="flex h-screen bg-gray-100 text-gray-800 font-sans antialiased">
-            {/* SIDEBAR */}
-            <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#111827] text-gray-300 transform transition-transform duration-300 ease-in-out
-        lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-                <div className="flex flex-col h-full">
-                    {/* Minimal Header */}
-                    <div className="flex items-center justify-between h-20 px-8">
-                        <span className="text-xl font-bold tracking-tight text-white uppercase">
-                            Dealer<span className="text-[#3cc720]">Pro</span>
-                        </span>
-                        <button onClick={() => setIsOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
-                            <X size={20} />
-                        </button>
-                    </div>
+            <Tooltip id="nav-tooltip" place="right" className="z-50 !bg-gray-800 !text-[#3cc720] !font-bold" />
 
-                    {/* Nav Links */}
-                    <nav className="flex-1 px-4 py-4 space-y-1">
+            {/* SIDEBAR - Slim Rail with icons starting from the top */}
+            <aside className={`
+                fixed inset-y-0 left-0 z-50 w-20 bg-[#111827] text-gray-300 transform transition-transform duration-300 ease-in-out
+                lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                <div className="flex flex-col h-full items-center">
+                    {/* Nav Links start immediately at top */}
+                    <nav className="flex-1 w-full px-2 py-6 space-y-4">
                         {navItems.map((item) => (
                             <a
                                 key={item.name}
                                 href={item.href}
-                                className="flex items-center gap-4 px-4 py-3 transition-all rounded-md hover:bg-gray-800 hover:text-[#3cc720] group"
+                                data-tooltip-id="nav-tooltip"
+                                data-tooltip-content={item.name}
+                                className="flex items-center justify-center w-full py-3 transition-all rounded-md hover:bg-gray-800 hover:text-[#3cc720] group"
                             >
                                 <span className="group-hover:scale-110 transition-transform">
                                     {item.icon}
                                 </span>
-                                <span className="text-[15px] font-medium tracking-wide">{item.name}</span>
                             </a>
                         ))}
                     </nav>
 
-
+                    {/* Mobile Close Button */}
+                    <button onClick={() => setIsOpen(false)} className="lg:hidden p-4 text-gray-400 hover:text-white">
+                        <X size={24} />
+                    </button>
                 </div>
             </aside>
 
             {/* CONTENT */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Top Navbar */}
-                <header className="h-16 flex items-center justify-between px-6 bg-white/50 backdrop-blur-md border-b border-gray-200 lg:px-10">
-                    <button
-                        onClick={() => setIsOpen(true)}
-                        className="p-2 text-gray-600 lg:hidden hover:bg-gray-200 rounded-lg"
-                    >
-                        <Menu size={24} />
-                    </button>
+                {/* Top Navbar with Logo at Top Left */}
+                <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 lg:px-10 shrink-0">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setIsOpen(true)}
+                            className="p-2 text-gray-600 lg:hidden hover:bg-gray-100 rounded-lg"
+                        >
+                            <Menu size={24} />
+                        </button>
 
-                    <div className="flex items-center ml-auto">
+                        {/* Logo at Top Left */}
+                        <span className="text-xl font-black tracking-tighter text-gray-900 uppercase">
+                            Dealer<span className="text-[#3cc720]">Pro</span>
+                        </span>
+                    </div>
+
+                    {/* Date/Time at Top Right */}
+                    <div className="flex items-center">
                         <div className="text-right">
                             <div className="flex flex-col items-end">
-                                <p className="text-sm font-bold text-gray-800 tabular-nums tracking-wider">
+                                <p className="text-sm font-bold text-gray-800 tabular-nums tracking-wider uppercase">
                                     {formatTime(currentTime)}
                                 </p>
-                                {/* Date */}
-                                <p className="text-sm font-bold text-[#3cc720] tabular-nums">
+                                <p className="text-[11px] font-bold text-[#3cc720] tabular-nums tracking-widest uppercase">
                                     {formatDate(currentTime)}
                                 </p>
-                                {/* Time */}
-
                             </div>
                         </div>
                     </div>
-
                 </header>
 
                 {/* Workspace */}
-                {/* Main Content: Full Height & Width */}
                 <main className="flex-1 overflow-y-auto bg-white relative">
                     {children || (
                         <div className="absolute inset-0 flex items-center justify-center p-8 text-center">
-                            <Outlet>
-                                {/* Load all sections dynamically here */}
-                            </Outlet>
+                            <Outlet />
                         </div>
                     )}
                 </main>

@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import MainLayout from "./Layouts/MainLayout";
 import Error404Page from "./Pages/Error404Page";
+import InventoryPage from "./Pages/InventoryPage";
 
 
 
@@ -15,7 +16,7 @@ const router = createBrowserRouter([
             },
             {
                 path: "inventory",
-                element: <h1>Inventory Section</h1>
+                element: <InventoryPage></InventoryPage>
             },
             {
                 path: "customers",
