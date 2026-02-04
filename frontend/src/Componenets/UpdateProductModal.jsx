@@ -66,6 +66,17 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // 1. ADD VALIDATION HERE
+        if (!formData.category || formData.category.trim() === "") {
+            return Swal.fire({
+                title: 'Selection Required',
+                text: 'Please select or type a product category before updating.',
+                icon: 'warning',
+                confirmButtonColor: '#111827',
+            });
+        }
+
         try {
             // Strip out non-updatable fields
             const { _id, stock, stock_count, createdAt, ...updatePayload } = formData;
@@ -105,7 +116,7 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
             <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col border border-gray-200">
                 <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50/30">
                     <h2 className="text-xl font-black text-[#111827] uppercase tracking-tighter">
-                        Edit <span className="text-blue-600">Product Info</span>
+                        Edit <span className="text-[#3cc720]">Product Info</span>
                     </h2>
                     <button onClick={onClose} className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full transition-all text-gray-400">
                         <X size={20} />
@@ -118,11 +129,11 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
                     </FormRow>
 
                     <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                        <FormRow label="Product Code (Permanent)">
+                        <FormRow label="Product Code (Not-Editable)">
                             <input value={formData.code} disabled className="w-full p-2 bg-gray-100 border border-gray-200 rounded text-sm outline-none font-semibold text-gray-400 cursor-not-allowed italic" />
                         </FormRow>
 
-                        <FormRow label="Product ID (Permanent)">
+                        <FormRow label="Product ID (Not-Editable)">
                             <input value={formData.product_id} disabled className="w-full p-2 bg-gray-100 border border-gray-200 rounded text-sm outline-none font-semibold text-gray-400 cursor-not-allowed italic" />
                         </FormRow>
 
@@ -194,8 +205,7 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
                     </div>
 
                     <div className="flex justify-end gap-4 pt-4 border-t border-gray-100">
-                        <button type="button" onClick={onClose} className="px-6 py-2 text-[10px] font-black uppercase text-gray-400 hover:text-red-500 tracking-widest transition-colors">Discard Changes</button>
-                        <button type="submit" className="px-10 py-2.5 bg-[#111827] text-blue-500 text-[10px] font-black uppercase rounded shadow-lg hover:bg-black border border-blue-500/30 transition-all tracking-[0.15em]">
+                        <button type="submit" className="px-10 py-2.5 bg-[#111827] text-[#3cc720] text-[10px] font-black uppercase rounded shadow-lg hover:bg-black border border-blue-500/30 transition-all tracking-[0.15em]">
                             Update Record
                         </button>
                     </div>
@@ -205,4 +215,4 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
     );
 };
 
-export default UpdateProductModal;
+export default UpdateProductModal; 

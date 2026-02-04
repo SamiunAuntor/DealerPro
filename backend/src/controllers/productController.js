@@ -96,7 +96,6 @@ async function addProduct(req, res) {
 }
 
 // PATCH update product (partial update) + lastUpdatedAt
-// PATCH update product (partial update) + lastUpdatedAt
 async function updateProduct(req, res) {
     const { id } = req.params;
 
@@ -134,13 +133,28 @@ async function updateProduct(req, res) {
 // DELETE product
 async function deleteProduct(req, res) {
     const { id } = req.params;
+    const { ObjectId } = require("mongodb");
+
+    let objectId;
     try {
-        const result = await getCollection("products").deleteOne({ _id: new require("mongodb").ObjectId(id) });
-        res.json(result);
+        objectId = new ObjectId(id);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Failed to delete product" });
+        return res.status(400).json({ message: "Invalid product ID" });
+    }
+
+    try {
+        const result = await getCollection("products").deleteOne({ _id: objectId });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
+        res.json({ message: "Product deleted successfully" });
+    } catch (err) {
+        console.error("Delete Product Error:", err);
+        res.status(500).json({ message: "Failed to delete product", error: err.message });
     }
 }
+
 
 module.exports = { getProducts, getProductById, addProduct, updateProduct, deleteProduct };

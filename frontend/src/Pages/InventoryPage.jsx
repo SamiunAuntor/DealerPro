@@ -12,6 +12,7 @@ import {
 import AddProductModal from '../Componenets/AddProductModal';
 import UpdateProductModal from '../Componenets/UpdateProductModal';
 import useAxios from '../Hooks/UseAxios';
+import Swal from 'sweetalert2';
 
 const InventoryPage = () => {
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -19,6 +20,8 @@ const InventoryPage = () => {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const axios = useAxios();
     const [products, setProducts] = useState([]);
+    const [deletingId, setDeletingId] = useState(null); // stores which product is being deleted
+
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -32,6 +35,37 @@ const InventoryPage = () => {
 
         fetchProducts();
     }, []);
+
+    const handleDelete = async (id, code) => {
+        const result = await Swal.fire({
+            title: `Delete "${code}"?`,
+            text: "This action cannot be undone!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#ef4444",
+            cancelButtonColor: "#6b7280",
+            confirmButtonText: "Yes, delete it!",
+            cancelButtonText: "Cancel"
+        });
+
+        if (result.isConfirmed) {
+            try {
+                setDeletingId(id); // disable button while deleting
+                await axios.delete(`/products/delete-product/${id}`);
+
+                // Refresh products
+                const response = await axios.get('/products/get-all-products');
+                setProducts(response.data);
+
+                Swal.fire('Deleted!', `"${code}" has been deleted.`, 'success');
+            } catch (err) {
+                console.error("Delete Error:", err);
+                Swal.fire('Error', 'Failed to delete the product.', 'error');
+            } finally {
+                setDeletingId(null);
+            }
+        }
+    };
 
     return (
         <div className="flex flex-col h-full w-full bg-white px-2 py-2">
@@ -108,7 +142,16 @@ const InventoryPage = () => {
                                             >
                                                 <Edit3 size={14} />
                                             </button>
-                                            <button title="Delete" className="p-1 text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
+                                            <button
+                                                title="Delete"
+                                                className={`p-1 text-red-400 hover:text-red-600 ${deletingId === p._id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                disabled={deletingId === p._id}
+                                                onClick={() => handleDelete(p._id, p.code)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+
+
                                         </div>
                                     </td>
                                 </tr>
