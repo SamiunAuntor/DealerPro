@@ -8,7 +8,7 @@ import {
     Menu,
     X
 } from 'lucide-react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 
@@ -42,30 +42,37 @@ const MainLayout = ({ children }) => {
         <div className="flex h-screen bg-gray-100 text-gray-800 font-sans antialiased">
             <Tooltip id="nav-tooltip" place="right" className="z-50 !bg-gray-800 !text-[#3cc720] !font-bold" />
 
-            {/* SIDEBAR - Slim Rail with icons starting from the top */}
+            {/* SIDEBAR */}
             <aside className={`
                 fixed inset-y-0 left-0 z-50 w-20 bg-[#111827] text-gray-300 transform transition-transform duration-300 ease-in-out
                 lg:relative lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 <div className="flex flex-col h-full items-center">
-                    {/* Nav Links start immediately at top */}
                     <nav className="flex-1 w-full px-2 py-6 space-y-4">
                         {navItems.map((item) => (
-                            <a
+                            <NavLink
                                 key={item.name}
-                                href={item.href}
+                                to={item.href}
                                 data-tooltip-id="nav-tooltip"
                                 data-tooltip-content={item.name}
-                                className="flex items-center justify-center w-full py-3 transition-all rounded-md hover:bg-gray-800 hover:text-[#3cc720] group"
+                                // The 'isActive' argument is provided by NavLink automatically
+                                className={({ isActive }) => `
+                                    flex items-center justify-center w-full py-3 transition-all rounded-md group
+                                    ${isActive
+                                        ? 'text-[#3cc720] bg-gray-800/50'
+                                        : 'hover:bg-gray-800 hover:text-[#3cc720]'
+                                    }
+                                `}
                             >
-                                <span className="group-hover:scale-110 transition-transform">
-                                    {item.icon}
-                                </span>
-                            </a>
+                                {({ isActive }) => (
+                                    <span className={`transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                                        {item.icon}
+                                    </span>
+                                )}
+                            </NavLink>
                         ))}
                     </nav>
 
-                    {/* Mobile Close Button */}
                     <button onClick={() => setIsOpen(false)} className="lg:hidden p-4 text-gray-400 hover:text-white">
                         <X size={24} />
                     </button>
@@ -74,7 +81,6 @@ const MainLayout = ({ children }) => {
 
             {/* CONTENT */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Top Navbar with Logo at Top Left */}
                 <header className="h-16 flex items-center justify-between px-6 bg-white border-b border-gray-200 lg:px-10 shrink-0">
                     <div className="flex items-center gap-4">
                         <button
@@ -84,13 +90,11 @@ const MainLayout = ({ children }) => {
                             <Menu size={24} />
                         </button>
 
-                        {/* Logo at Top Left */}
                         <span className="text-xl font-black tracking-tighter text-gray-900 uppercase">
                             Dealer<span className="text-[#3cc720]">Pro</span>
                         </span>
                     </div>
 
-                    {/* Date/Time at Top Right */}
                     <div className="flex items-center">
                         <div className="text-right">
                             <div className="flex flex-col items-end">
@@ -105,17 +109,16 @@ const MainLayout = ({ children }) => {
                     </div>
                 </header>
 
-                {/* Workspace */}
                 <main className="flex-1 overflow-y-auto bg-white relative">
                     {children || (
-                        <div className="absolute inset-0 flex items-center justify-center p-8 text-center">
+                        <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
                             <Outlet />
                         </div>
                     )}
                 </main>
             </div>
 
-            {/* Mobile Blur Overlay */}
+            {/* Mobile Overlay */}
             {isOpen && (
                 <div
                     className="fixed inset-0 bg-gray-900/20 backdrop-blur-[2px] z-40 lg:hidden"
