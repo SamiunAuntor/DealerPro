@@ -75,7 +75,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
 
 
     const addProductMutation = useMutation({
-        mutationFn: (productData) => axios.post('/product', productData),
+        mutationFn: (productData) => axios.post('/products/add-product', productData),
 
         onSuccess: () => {
             Swal.fire({

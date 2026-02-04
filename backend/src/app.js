@@ -8,7 +8,7 @@ app.use(express.json());
 
 // Routes
 const productRoutes = require("./routes/products");
-app.use("/api/products", productRoutes);
+app.use("/products", productRoutes);
 
 // test route
 app.get("/", (req, res) => {
