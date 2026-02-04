@@ -156,5 +156,39 @@ async function deleteProduct(req, res) {
     }
 }
 
+// POST stock-in (add quantity to stock array)
+async function stockIn(req, res) {
+    const { id } = req.params;
+    const { quantity } = req.body;
+    const { ObjectId } = require("mongodb");
 
-module.exports = { getProducts, getProductById, addProduct, updateProduct, deleteProduct };
+    if (!quantity || isNaN(quantity) || quantity <= 0) {
+        return res.status(400).json({ message: "Valid quantity is required" });
+    }
+
+    try {
+        const result = await getCollection("products").updateOne(
+            { _id: new ObjectId(id) },
+            {
+                $push: {
+                    stock: {
+                        date: new Date(),
+                        quantity: Number(quantity)
+                    }
+                },
+                $set: { lastUpdatedAt: new Date() }
+            }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
+        res.json({ message: "Stock added successfully" });
+    } catch (err) {
+        console.error("Stock In Error:", err);
+        res.status(500).json({ message: "Failed to update stock" });
+    }
+}
+
+module.exports = { getProducts, getProductById, addProduct, updateProduct, deleteProduct, stockIn };

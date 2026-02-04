@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'; // Added the missing imports here
 import AddProductModal from '../Componenets/AddProductModal';
 import UpdateProductModal from '../Componenets/UpdateProductModal';
+import StockInModal from '../Componenets/StockInModal';
 import useAxios from '../Hooks/UseAxios';
 import Swal from 'sweetalert2';
 
@@ -21,6 +22,7 @@ const InventoryPage = () => {
     const axios = useAxios();
     const [products, setProducts] = useState([]);
     const [deletingId, setDeletingId] = useState(null); // stores which product is being deleted
+    const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
 
 
     useEffect(() => {
@@ -131,20 +133,28 @@ const InventoryPage = () => {
                                     </td>
                                     <td className="px-2 py-1.5 text-center">
                                         <div className="flex items-center justify-center gap-1">
-                                            <button title="Stock In" className="p-1 text-slate-500 hover:text-blue-600"><PackagePlus size={14} /></button>
+                                            <button title="Stock In"
+                                                className="p-1 text-green-500 "
+                                                onClick={() => {
+                                                    setSelectedProduct(p);
+                                                    setIsStockInModalOpen(true);
+                                                }}
+                                            >
+                                                <PackagePlus size={16} />
+                                            </button>
                                             <button
                                                 title="Edit"
-                                                className="p-1 text-slate-500 hover:text-gray-900"
+                                                className="p-1 text-blue-500 "
                                                 onClick={() => {
                                                     setSelectedProduct(p);
                                                     setIsUpdateModalOpen(true);
                                                 }}
                                             >
-                                                <Edit3 size={14} />
+                                                <Edit3 size={16} />
                                             </button>
                                             <button
                                                 title="Delete"
-                                                className={`p-1 text-red-400 hover:text-red-600 ${deletingId === p._id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                className={`p-1 text-red-500  ${deletingId === p._id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 disabled={deletingId === p._id}
                                                 onClick={() => handleDelete(p._id, p.code)}
                                             >
@@ -194,6 +204,20 @@ const InventoryPage = () => {
                     } catch (error) {
                         console.error('Failed to refresh products:', error);
                     }
+                }}
+            />
+
+            <StockInModal
+                isOpen={isStockInModalOpen}
+                onClose={() => {
+                    setIsStockInModalOpen(false);
+                    setSelectedProduct(null);
+                }}
+                product={selectedProduct}
+                onUpdateSuccess={async () => {
+                    // Refresh products list
+                    const response = await axios.get('/products/get-all-products');
+                    setProducts(response.data);
                 }}
             />
 
