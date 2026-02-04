@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Plus,
     Search,
@@ -10,24 +10,28 @@ import {
     ChevronRight
 } from 'lucide-react'; // Added the missing imports here
 import AddProductModal from '../Componenets/AddProductModal';
+import UpdateProductModal from '../Componenets/UpdateProductModal';
+import useAxios from '../Hooks/UseAxios';
 
 const InventoryPage = () => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
+    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const axios = useAxios();
+    const [products, setProducts] = useState([]);
 
-    const staticProducts = [
-        {
-            _id: '1', code: 'CEM-001', product_id: 'PID-9921', name: 'Holcim Strong Structure',
-            category: 'Construction', company_commission: 45, company_discount: 2,
-            unit_type: 'box', pieces_per_packet: 1, pieces_per_cartoon: 20,
-            purchase_price: 540, stock_count: 850
-        },
-        {
-            _id: '2', code: 'STL-772', product_id: 'PID-4432', name: 'BSRM Xtreme 500W',
-            category: 'Hardware', company_commission: 120, company_discount: 1.5,
-            unit_type: 'pieces', pieces_per_packet: 0, pieces_per_cartoon: 50,
-            purchase_price: 92000, stock_count: 15
-        }
-    ];
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const response = await axios.get('/products/get-all-products');
+                setProducts(response.data); // store the data in state
+            } catch (error) {
+                console.error("Failed to fetch products:", error);
+            }
+        };
+
+        fetchProducts();
+    }, []);
 
     return (
         <div className="flex flex-col h-full w-full bg-white px-2 py-2">
@@ -45,10 +49,10 @@ const InventoryPage = () => {
                         />
                     </div>
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => setIsAddProductModalOpen(true)}
                         className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 shrink-0"
                     >
-                        <Plus size={14} /> <span className="hidden xs:inline">ADD PRODUCT</span>
+                        <Plus size={14} /> <span className=" xs:inline">ADD PRODUCT</span>
                     </button>
                 </div>
             </div>
@@ -74,13 +78,13 @@ const InventoryPage = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {staticProducts.map((p) => (
+                            {products.map((p) => (
                                 <tr key={p._id} className="hover:bg-gray-100 divide-x divide-gray-200 transition-colors">
                                     <td className="px-2 py-1.5 text-xs font-medium text-gray-700 text-center">{p.code}</td>
-                                    <td className="px-2 py-1.5 text-[10px] text-gray-500 text-center">{p.product_id}</td>
+                                    <td className="px-2 py-1.5 text-xs text-gray-500 text-center">{p.product_id}</td>
                                     <td className="px-2 py-1.5 text-xs font-semibold text-gray-800 truncate text-center">{p.name}</td>
-                                    <td className="px-2 py-1.5 text-[10px] uppercase font-bold text-gray-400 text-center">{p.category}</td>
-                                    <td className="px-2 py-1.5 text-center text-[10px] capitalize">{p.unit_type}</td>
+                                    <td className="px-2 py-1.5 text-xs uppercase font-bold text-gray-400 text-center">{p.category}</td>
+                                    <td className="px-2 py-1.5 text-center text-xs capitalize">{p.unit_type}</td>
                                     <td className="px-2 py-1.5 text-center text-xs text-gray-500">{p.pieces_per_packet}</td>
                                     <td className="px-2 py-1.5 text-center text-xs text-gray-500">{p.pieces_per_cartoon}</td>
                                     <td className="px-2 py-1.5 text-xs font-bold text-blue-700 bg-blue-50/20 text-center">৳{p.purchase_price}</td>
@@ -92,9 +96,18 @@ const InventoryPage = () => {
                                         </span>
                                     </td>
                                     <td className="px-2 py-1.5 text-center">
-                                        <div className="flex items-center justify-end gap-1">
+                                        <div className="flex items-center justify-center gap-1">
                                             <button title="Stock In" className="p-1 text-slate-500 hover:text-blue-600"><PackagePlus size={14} /></button>
-                                            <button title="Edit" className="p-1 text-slate-500 hover:text-gray-900"><Edit3 size={14} /></button>
+                                            <button
+                                                title="Edit"
+                                                className="p-1 text-slate-500 hover:text-gray-900"
+                                                onClick={() => {
+                                                    setSelectedProduct(p);
+                                                    setIsUpdateModalOpen(true);
+                                                }}
+                                            >
+                                                <Edit3 size={14} />
+                                            </button>
                                             <button title="Delete" className="p-1 text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                                         </div>
                                     </td>
@@ -107,7 +120,7 @@ const InventoryPage = () => {
 
             {/* Pagination UI */}
             <div className="mt-2 px-1 flex items-center justify-between shrink-0">
-                <p className="text-[10px] text-gray-400 font-medium italic">Showing {staticProducts.length} entries</p>
+                <p className="text-[10px] text-gray-400 font-medium italic">Showing {products.length} entries</p>
                 <div className="flex items-center gap-4">
                     <button className="text-[10px] font-bold text-gray-400 hover:text-gray-600 flex items-center gap-1 uppercase">
                         <ChevronLeft size={12} /> Prev
@@ -121,7 +134,26 @@ const InventoryPage = () => {
                 </div>
             </div>
 
-            <AddProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+            <AddProductModal isOpen={isAddProductModalOpen} onClose={() => setIsAddProductModalOpen(false)} />
+            <UpdateProductModal
+                // The key ensures the modal's internal state resets when the product changes
+                key={selectedProduct?._id || 'none'}
+                isOpen={isUpdateModalOpen}
+                onClose={() => {
+                    setIsUpdateModalOpen(false);
+                    setSelectedProduct(null);
+                }}
+                product={selectedProduct}
+                onUpdateSuccess={async () => {
+                    try {
+                        const response = await axios.get('/products/get-all-products');
+                        setProducts(response.data);
+                    } catch (error) {
+                        console.error('Failed to refresh products:', error);
+                    }
+                }}
+            />
+
         </div>
     );
 };

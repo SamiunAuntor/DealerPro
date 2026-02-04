@@ -1,10 +1,20 @@
 const { getCollection } = require("../db/mongo");
 
-// GET all products
+// GET all products with computed stock_count
 async function getProducts(req, res) {
     try {
         const products = await getCollection("products").find({}).toArray();
-        res.json(products);
+
+        // Map over products and compute total stock
+        const productsWithStock = products.map(p => {
+            const stock_count = p.stock?.reduce((acc, s) => acc + (s.quantity || 0), 0) || 0;
+            return {
+                ...p,
+                stock_count, // add total stock
+            };
+        });
+
+        res.json(productsWithStock);
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Failed to fetch products" });
@@ -67,7 +77,9 @@ async function addProduct(req, res) {
                 }
             ],
 
-            createdAt: new Date()
+            createdAt: new Date(),
+            lastUpdatedAt: null // initially null
+
         };
 
         const result = await getCollection("products").insertOne(product);
@@ -83,19 +95,39 @@ async function addProduct(req, res) {
     }
 }
 
-// PUT update product
+// PATCH update product (partial update) + lastUpdatedAt
+// PATCH update product (partial update) + lastUpdatedAt
 async function updateProduct(req, res) {
     const { id } = req.params;
-    const updateData = req.body;
+
+    // 1. Create a clean copy of body
+    const updateData = { ...req.body };
+
+    // 2. Remove fields that shouldn't be updated manually via this route
+    delete updateData._id;
+    delete updateData.stock;
+    delete updateData.stock_count;
+
+    updateData.lastUpdatedAt = new Date();
+
     try {
+        // We use require("mongodb").ObjectId(id) to ensure it's defined
+        const { ObjectId } = require("mongodb");
+
         const result = await getCollection("products").updateOne(
-            { _id: new require("mongodb").ObjectId(id) },
+            { _id: new ObjectId(id) },
             { $set: updateData }
         );
-        res.json(result);
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ message: "Product not found" });
+        }
+
+        res.json({ message: "Product updated successfully" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: "Failed to update product" });
+        // This log will now tell you exactly what went wrong if it fails again
+        console.error("Backend Update Error Details:", err);
+        res.status(500).json({ message: "Failed to update product", error: err.message });
     }
 }
 
