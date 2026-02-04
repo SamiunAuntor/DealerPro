@@ -91,7 +91,7 @@ const MainLayout = ({ children }) => {
                         </button>
 
                         <span className="text-xl font-black tracking-tighter text-gray-900 uppercase">
-                            Dealer<span className="text-[#3cc720]">Pro</span>
+                            Dealer <span className="text-[#3cc720]">Pro</span>
                         </span>
                     </div>
 
