@@ -6,16 +6,24 @@ let db;
 async function connectDB() {
     try {
         await client.connect();
-        db = client.db("DealerPro"); // explicitly select your DB
-        console.log("✅ MongoDB connected to DealerPro DB");
+        db = client.db("DealerPro");
+        await ensureIndexes();
+        console.log("MongoDB connected to DealerPro DB");
     } catch (error) {
-        console.error("❌ MongoDB connection failed:", error.message);
+        console.error("MongoDB connection failed:", error.message);
         process.exit(1);
     }
 }
 
+async function ensureIndexes() {
+    await db.collection("customers").createIndex({ phone: 1 }, { unique: true });
+}
+
 function getDB() {
-    if (!db) throw new Error("Database not initialized");
+    if (!db) {
+        throw new Error("Database not initialized");
+    }
+
     return db;
 }
 
