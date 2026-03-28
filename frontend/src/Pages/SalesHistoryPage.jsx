@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import { Eye, RotateCcw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import Swal from "sweetalert2";
 import useAxios from "../Hooks/UseAxios";
 import SaleInvoiceDetailsModal from "../Componenets/SaleInvoiceDetailsModal";
 import ReturnSaleModal from "../Componenets/ReturnSaleModal";
@@ -87,12 +89,156 @@ function SalesHistoryPage() {
 
     const getDisplayCustomerName = (name) =>
         name === "Walk-in Customer" ? "Anonymous Customer" : name;
+    const salesRows = salesQuery.data || [];
+
+    const handleDownloadSalesReport = () => {
+        if (salesRows.length === 0) {
+            Swal.fire("No Data", "There are no sales to include in the report.", "info");
+            return;
+        }
+
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const marginX = 14;
+        const usableWidth = pageWidth - marginX * 2;
+        let y = 18;
+
+        const ensureSpace = (requiredHeight = 10) => {
+            if (y + requiredHeight <= pageHeight - 14) {
+                return;
+            }
+
+            doc.addPage();
+            y = 18;
+        };
+
+        const addSummaryLine = (label, value = "") => {
+            ensureSpace(8);
+            doc.setFont("helvetica", "bold");
+            doc.text(`${label}:`, marginX, y);
+            doc.setFont("helvetica", "normal");
+            doc.text(String(value), 62, y);
+            y += 7;
+        };
+
+        const drawTable = (title, columns, rows) => {
+            ensureSpace(18);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.text(title, marginX, y);
+            y += 6;
+
+            const headerHeight = 8;
+            const lineHeight = 6;
+            const totalRequestedWidth = columns.reduce((sum, column) => sum + column.width, 0);
+            const normalizedColumns = columns.map((column) => ({
+                ...column,
+                width: (column.width / totalRequestedWidth) * usableWidth,
+            }));
+
+            const drawHeader = () => {
+                doc.setFillColor(243, 244, 246);
+                doc.rect(marginX, y, usableWidth, headerHeight, "F");
+                doc.setDrawColor(220, 224, 230);
+                doc.rect(marginX, y, usableWidth, headerHeight);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(8);
+
+                let x = marginX;
+                normalizedColumns.forEach((column) => {
+                    doc.text(column.header, x + 2, y + 5.2);
+                    x += column.width;
+                });
+
+                y += headerHeight;
+            };
+
+            drawHeader();
+
+            rows.forEach((row) => {
+                const cellLines = normalizedColumns.map((column) =>
+                    doc.splitTextToSize(String(row[column.key] ?? "-"), column.width - 4)
+                );
+                const rowHeight =
+                    Math.max(...cellLines.map((lines) => lines.length), 1) * lineHeight + 2;
+
+                ensureSpace(rowHeight + 2);
+
+                if (y + rowHeight > pageHeight - 14) {
+                    doc.addPage();
+                    y = 18;
+                    drawHeader();
+                }
+
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(8);
+                let x = marginX;
+
+                normalizedColumns.forEach((column, index) => {
+                    doc.rect(x, y, column.width, rowHeight);
+                    doc.text(cellLines[index], x + 2, y + 5);
+                    x += column.width;
+                });
+
+                y += rowHeight;
+            });
+        };
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text("Sales History Report", marginX, y);
+        y += 10;
+
+        doc.setFontSize(10);
+        addSummaryLine("Generated At", formatDateTime(new Date()));
+        addSummaryLine("Total Rows", salesRows.length);
+        addSummaryLine("From", historyFilters.from || "All Time");
+        addSummaryLine("To", historyFilters.to || "Now");
+        addSummaryLine("Channel", historyFilters.channel || "All channels");
+
+        const selectedCustomerOption = customerOptions.find(
+            (customer) => customer._id === historyFilters.customer_id
+        );
+        addSummaryLine(
+            "Customer",
+            historyFilters.customer_id
+                ? getDisplayCustomerName(selectedCustomerOption?.name)
+                : "All customers"
+        );
+
+        y += 2;
+
+        drawTable(
+            "Sales History",
+            [
+                { header: "Invoice", key: "invoice_number", width: 34 },
+                { header: "Customer", key: "customer_name", width: 28 },
+                { header: "Channel", key: "channel", width: 18 },
+                { header: "Amount", key: "total_amount", width: 22 },
+                { header: "Profit/Loss", key: "profit_loss", width: 24 },
+                { header: "Return", key: "return_status", width: 22 },
+                { header: "Created", key: "created_at", width: 32 },
+            ],
+            salesRows.map((sale) => ({
+                invoice_number: sale.invoice_number,
+                customer_name: getDisplayCustomerName(sale.customer_snapshot?.name),
+                channel: sale.channel,
+                total_amount: formatCurrency(sale.total_amount),
+                profit_loss: formatCurrency(sale.profit_loss),
+                return_status: getReturnStatusLabel(sale.return_status),
+                created_at: formatDateTime(sale.created_at),
+            }))
+        );
+
+        doc.save("sales-history-report.pdf");
+    };
 
     return (
         <div className="flex min-h-full w-full flex-col gap-4 bg-white p-3 pb-6">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
-                    <div>
+                <div className="mb-4 flex flex-col items-start justify-between gap-3 xl:flex-row xl:items-center">
+                    <div className="self-start text-left">
                         <h1 className="text-xl font-black uppercase tracking-tight text-gray-900">
                             Sales History
                         </h1>
@@ -101,52 +247,63 @@ function SalesHistoryPage() {
                         </p>
                     </div>
 
-                    <div className="grid w-full gap-2 md:w-auto md:grid-cols-4">
-                        <input
-                            className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
-                            onChange={(event) =>
-                                setHistoryFilters((prev) => ({ ...prev, from: event.target.value }))
-                            }
-                            type="date"
-                            value={historyFilters.from}
-                        />
-                        <input
-                            className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
-                            onChange={(event) =>
-                                setHistoryFilters((prev) => ({ ...prev, to: event.target.value }))
-                            }
-                            type="date"
-                            value={historyFilters.to}
-                        />
-                        <select
-                            className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
-                            onChange={(event) =>
-                                setHistoryFilters((prev) => ({ ...prev, channel: event.target.value }))
-                            }
-                            value={historyFilters.channel}
-                        >
-                            <option value="">All channels</option>
-                            <option value="pos">POS</option>
-                            <option value="customer">Customer</option>
-                        </select>
-                        <select
-                            className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
-                            onChange={(event) =>
-                                setHistoryFilters((prev) => ({ ...prev, customer_id: event.target.value }))
-                            }
-                            value={historyFilters.customer_id}
-                        >
-                            <option value="">All customers</option>
-                            {customerOptions.map((customer) => (
-                                <option key={customer._id} value={customer._id}>
-                                    {customer.name}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="flex w-full flex-col gap-2 xl:w-auto">
+                        <div className="grid w-full gap-2 md:grid-cols-2 xl:grid-cols-4">
+                            <input
+                                className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
+                                onChange={(event) =>
+                                    setHistoryFilters((prev) => ({ ...prev, from: event.target.value }))
+                                }
+                                type="date"
+                                value={historyFilters.from}
+                            />
+                            <input
+                                className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
+                                onChange={(event) =>
+                                    setHistoryFilters((prev) => ({ ...prev, to: event.target.value }))
+                                }
+                                type="date"
+                                value={historyFilters.to}
+                            />
+                            <select
+                                className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
+                                onChange={(event) =>
+                                    setHistoryFilters((prev) => ({ ...prev, channel: event.target.value }))
+                                }
+                                value={historyFilters.channel}
+                            >
+                                <option value="">All channels</option>
+                                <option value="pos">POS</option>
+                                <option value="customer">Customer</option>
+                            </select>
+                            <select
+                                className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
+                                onChange={(event) =>
+                                    setHistoryFilters((prev) => ({ ...prev, customer_id: event.target.value }))
+                                }
+                                value={historyFilters.customer_id}
+                            >
+                                <option value="">All customers</option>
+                                {customerOptions.map((customer) => (
+                                    <option key={customer._id} value={customer._id}>
+                                        {customer.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex justify-start pt-1 xl:justify-end xl:pb-0">
+                            <button
+                                className="rounded bg-[#111827] px-4 py-2 text-[11px] font-black uppercase tracking-wider text-[#3cc720] transition hover:bg-black"
+                                onClick={handleDownloadSalesReport}
+                                type="button"
+                            >
+                                Download Sales Report
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <div className="mt-1 overflow-x-auto rounded-lg border border-gray-200">
                     <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
                         <thead className="border-b border-gray-200 bg-gray-100">
                             <tr className="divide-x divide-gray-200">
