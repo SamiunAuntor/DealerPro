@@ -1,7 +1,11 @@
 const { getCollection } = require("../db/mongo");
 
 function getDateKey(date = new Date()) {
-    return date.toISOString().slice(0, 10).replace(/-/g, "");
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}${month}${day}`;
 }
 
 function getCustomerToken(customer) {
@@ -11,12 +15,7 @@ function getCustomerToken(customer) {
         return phoneDigits.slice(-4);
     }
 
-    const nameToken = String(customer?.name || "CUST")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .toUpperCase()
-        .slice(0, 4);
-
-    return nameToken || "CUST";
+    return "0000";
 }
 
 async function generateDocumentNumber({ scope, prefix, customer, now = new Date() }) {
@@ -24,15 +23,15 @@ async function generateDocumentNumber({ scope, prefix, customer, now = new Date(
     const countersCollection = getCollection("invoice_counters");
 
     const counter = await countersCollection.findOneAndUpdate(
-        { _id: `${scope}:${dateKey}` },
+        { _id: scope },
         { $inc: { sequence: 1 }, $setOnInsert: { created_at: now } },
         { upsert: true, returnDocument: "after" }
     );
 
-    const sequence = String(counter.sequence).padStart(4, "0");
+    const sequence = String(counter.sequence).padStart(7, "0");
     const customerToken = getCustomerToken(customer);
 
-    return `${prefix}-${dateKey}-${sequence}-${customerToken}`;
+    return `${prefix}-${dateKey}-${customerToken}-${sequence}`;
 }
 
 async function generateInvoiceNumber(customer, now = new Date()) {

@@ -31,17 +31,30 @@ async function ensureIndexes() {
     await db.collection("returns").createIndex({ return_number: 1 }, { unique: true });
     await db.collection("returns").createIndex({ original_sale_id: 1, created_at: -1 });
     await db.collection("returns").createIndex({ customer_id: 1, created_at: -1 });
+    await db.collection("company_due_settlements").createIndex({ settled_at: -1 });
+    await db.collection("company_due_settlements").createIndex({ cutoff_sale_id: 1 });
 }
 
 async function ensureWalkInCustomer() {
     const customersCollection = db.collection("customers");
     const existingWalkInCustomer = await customersCollection.findOne({ system_tag: WALK_IN_CUSTOMER_TAG });
+    const now = new Date();
 
     if (existingWalkInCustomer) {
+        await customersCollection.updateOne(
+            { _id: existingWalkInCustomer._id },
+            {
+                $set: {
+                    name: WALK_IN_CUSTOMER_NAME,
+                    phone: WALK_IN_CUSTOMER_PHONE,
+                    updated_at: now,
+                    is_system: true,
+                    system_tag: WALK_IN_CUSTOMER_TAG,
+                },
+            }
+        );
         return;
     }
-
-    const now = new Date();
 
     await customersCollection.insertOne({
         name: WALK_IN_CUSTOMER_NAME,

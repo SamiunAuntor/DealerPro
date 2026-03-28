@@ -1,4 +1,5 @@
 const salesService = require("../services/salesService");
+const companyDueSettlementService = require("../services/companyDueSettlementService");
 
 function sendErrorResponse(res, error, fallbackMessage) {
     const statusCode = error.statusCode || 500;
@@ -43,10 +44,31 @@ async function getSale(req, res) {
 
 async function getCompanyDueSummary(req, res) {
     try {
-        const summary = await salesService.getCompanyDueSummary(req.query);
+        const summary = await companyDueSettlementService.getOutstandingCompanyDueSummary(req.query);
         return res.json(summary);
     } catch (error) {
         return sendErrorResponse(res, error, "Failed to fetch company due summary");
+    }
+}
+
+async function getCompanyDueSettlements(req, res) {
+    try {
+        const settlements = await companyDueSettlementService.listSettlements();
+        return res.json(settlements);
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to fetch company due settlements");
+    }
+}
+
+async function createCompanyDueSettlement(req, res) {
+    try {
+        const settlement = await companyDueSettlementService.createSettlement(req.body);
+        return res.status(201).json({
+            message: "Company due marked as collected successfully",
+            settlement,
+        });
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to create company due settlement");
     }
 }
 
@@ -55,4 +77,6 @@ module.exports = {
     getSales,
     getSale,
     getCompanyDueSummary,
+    getCompanyDueSettlements,
+    createCompanyDueSettlement,
 };

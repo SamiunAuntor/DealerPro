@@ -1,6 +1,6 @@
 const WALK_IN_CUSTOMER_TAG = "walk-in";
-const WALK_IN_CUSTOMER_PHONE = "WALK-IN-CUSTOMER";
-const WALK_IN_CUSTOMER_NAME = "Walk-in Customer";
+const WALK_IN_CUSTOMER_PHONE = "01200000000";
+const WALK_IN_CUSTOMER_NAME = "Anonymous Customer";
 
 module.exports = {
     WALK_IN_CUSTOMER_TAG,

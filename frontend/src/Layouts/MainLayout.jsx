@@ -19,10 +19,10 @@ function MainLayout({ children }) {
 
     const navItems = [
         { name: "Home", icon: <LayoutGrid size={22} />, href: "/" },
-        { name: "Inventory", icon: <Package size={22} />, href: "/inventory" },
-        { name: "Customers", icon: <Users size={22} />, href: "/customers" },
+        { name: "Product Inventory", icon: <Package size={22} />, href: "/inventory" },
+        { name: "Customer Directory", icon: <Users size={22} />, href: "/customers" },
         { name: "POS", icon: <ShoppingCart size={22} />, href: "/pos" },
-        { name: "Sales", icon: <FileText size={22} />, href: "/sales" },
+        { name: "Sales History", icon: <FileText size={22} />, href: "/sales" },
         { name: "Company Due", icon: <Wallet size={22} />, href: "/company-due" },
     ];
 

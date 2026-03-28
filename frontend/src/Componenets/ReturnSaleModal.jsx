@@ -223,6 +223,11 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
         return null;
     }
 
+    const displayCustomerName =
+        sale.customer_snapshot?.name === "Walk-in Customer"
+            ? "Anonymous Customer"
+            : sale.customer_snapshot?.name;
+
     const handleItemChange = (productId, field, value) => {
         setReturnItems((prev) =>
             prev.map((item) =>
@@ -300,7 +305,7 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
                             Return Sale
                         </h2>
                         <p className="text-xs font-semibold text-gray-500">
-                            {sale.invoice_number} | {sale.customer_snapshot?.name}
+                            {sale.invoice_number} | {displayCustomerName}
                         </p>
                     </div>
                     <button

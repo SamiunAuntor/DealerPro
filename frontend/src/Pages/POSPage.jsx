@@ -74,6 +74,22 @@ function POSPage() {
         );
     }, [customersQuery.data, effectiveSelectedCustomerId]);
 
+    const getDisplayCustomerName = (customer) => {
+        if (!customer?.name) {
+            return "None";
+        }
+
+        return customer.name === "Walk-in Customer" ? "Anonymous Customer" : customer.name;
+    };
+
+    const getDisplayCustomerPhone = (customer) => {
+        if (!customer?.phone || customer.phone === "WALK-IN-CUSTOMER" || customer.phone === "ANONYMOUS-CUSTOMER") {
+            return "-";
+        }
+
+        return customer.phone;
+    };
+
     const previewItems = useMemo(() => {
         const items = saleItems
             .map((item) => {
@@ -356,19 +372,19 @@ function POSPage() {
                                 </select>
                             </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
                                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                                     Selected Customer
                                 </p>
                                 <p className="mt-2 text-sm font-semibold text-gray-900">
-                                    {selectedCustomer?.name || "None"}
+                                    {getDisplayCustomerName(selectedCustomer)}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                    {selectedCustomer?.phone || "-"}
+                                    {getDisplayCustomerPhone(selectedCustomer)}
                                 </p>
                             </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
                                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                                     Gross Amount
                                 </p>
@@ -377,7 +393,7 @@ function POSPage() {
                                 </p>
                             </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
                                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                                     Company Discount
                                 </p>
@@ -386,7 +402,7 @@ function POSPage() {
                                 </p>
                             </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
                                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                                     Final Amount
                                 </p>
@@ -395,7 +411,7 @@ function POSPage() {
                                 </p>
                             </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
                                 <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                                     Profit / Loss
                                 </p>

@@ -8,6 +8,15 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
     }
 
     const hasReturns = Number(sale.return_summary?.returned_quantity_pieces || 0) > 0;
+    const displayCustomerName =
+        sale.customer_snapshot?.name === "Walk-in Customer"
+            ? "Anonymous Customer"
+            : sale.customer_snapshot?.name;
+    const displayCustomerPhone =
+        sale.customer_snapshot?.phone === "WALK-IN-CUSTOMER" ||
+        sale.customer_snapshot?.phone === "ANONYMOUS-CUSTOMER"
+            ? "-"
+            : sale.customer_snapshot?.phone;
 
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#111827]/60 p-4 backdrop-blur-sm">
@@ -30,8 +39,8 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                     <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Customer</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-800">{sale.customer_snapshot?.name}</p>
-                            <p className="text-xs text-gray-500">{sale.customer_snapshot?.phone}</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">{displayCustomerName}</p>
+                            <p className="text-xs text-gray-500">{displayCustomerPhone}</p>
                         </div>
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Channel</p>

@@ -85,6 +85,9 @@ function SalesHistoryPage() {
         return "bg-gray-100 text-gray-600";
     };
 
+    const getDisplayCustomerName = (name) =>
+        name === "Walk-in Customer" ? "Anonymous Customer" : name;
+
     return (
         <div className="flex min-h-full w-full flex-col gap-4 bg-white p-3 pb-6">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -194,7 +197,7 @@ function SalesHistoryPage() {
                                         {sale.invoice_number}
                                     </td>
                                     <td className="px-3 py-2 text-center text-sm text-gray-700">
-                                        {sale.customer_snapshot?.name}
+                                        {getDisplayCustomerName(sale.customer_snapshot?.name)}
                                     </td>
                                     <td className="px-3 py-2 text-center text-sm capitalize text-gray-700">
                                         {sale.channel}
