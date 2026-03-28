@@ -4,6 +4,7 @@ import Error404Page from "./Pages/Error404Page";
 import InventoryPage from "./Pages/InventoryPage";
 import CustomersPage from "./Pages/CustomersPage";
 import POSPage from "./Pages/POSPage";
+import SalesHistoryPage from "./Pages/SalesHistoryPage";
 
 const router = createBrowserRouter([
     {
@@ -25,6 +26,10 @@ const router = createBrowserRouter([
             {
                 path: "pos",
                 element: <POSPage />,
+            },
+            {
+                path: "sales",
+                element: <SalesHistoryPage />,
             },
             {
                 path: "company-due",
