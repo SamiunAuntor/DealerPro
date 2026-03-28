@@ -7,9 +7,11 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
         return null;
     }
 
+    const hasReturns = Number(sale.return_summary?.returned_quantity_pieces || 0) > 0;
+
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#111827]/60 p-4 backdrop-blur-sm">
-            <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+            <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50/40 p-4">
                     <div>
                         <h2 className="text-xl font-black uppercase tracking-tighter text-[#111827]">Invoice Details</h2>
@@ -24,8 +26,8 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                     </button>
                 </div>
 
-                <div className="space-y-5 overflow-y-auto p-6">
-                    <div className="grid gap-4 md:grid-cols-6">
+                <div className="space-y-5 p-6 pb-10">
+                    <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Customer</p>
                             <p className="mt-2 text-sm font-semibold text-gray-800">{sale.customer_snapshot?.name}</p>
@@ -34,6 +36,11 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Channel</p>
                             <p className="mt-2 text-sm font-semibold capitalize text-gray-800">{sale.channel}</p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Subtotal</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">{formatCurrency(sale.subtotal_after_company_discount || 0)}</p>
+                            <p className="text-xs text-gray-500">After company discount</p>
                         </div>
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Total Amount</p>
@@ -57,46 +64,65 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                             <p className="mt-2 text-sm font-semibold capitalize text-gray-800">
                                 {String(sale.return_status || "not_returned").replaceAll("_", " ")}
                             </p>
-                            <p className="text-xs text-gray-500">
-                                Refunded {formatCurrency(sale.return_summary?.returned_amount || 0)}
-                            </p>
+                            {hasReturns && (
+                                <p className="text-xs text-gray-500">
+                                    Refunded {formatCurrency(sale.return_summary?.returned_amount || 0)}
+                                </p>
+                            )}
                         </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-4">
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Pieces</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-800">
-                                {sale.return_summary?.returned_quantity_pieces || 0}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Company Disc.</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-800">
-                                {formatCurrency(sale.return_summary?.returned_company_discount || 0)}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Dealer Disc.</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-800">
-                                {formatCurrency(sale.return_summary?.returned_dealer_discount || 0)}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Commission</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-800">
-                                {formatCurrency(sale.return_summary?.returned_company_commission || 0)}
-                            </p>
-                        </div>
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned P/L</p>
-                            <p className="mt-2 text-sm font-semibold text-gray-800">
-                                {formatCurrency(sale.return_summary?.returned_profit_loss || 0)}
-                            </p>
-                        </div>
-                    </div>
+                    {hasReturns && (
+                        <div className="space-y-3">
+                            <div>
+                                <h3 className="text-sm font-black uppercase tracking-wide text-gray-900">Return Summary</h3>
+                                <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+                                    Only shown when a return has happened for this sale
+                                </p>
+                            </div>
 
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+                                <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-red-500">Returned Amount</p>
+                                    <p className="mt-2 text-sm font-semibold text-red-700">
+                                        {formatCurrency(sale.return_summary?.returned_amount || 0)}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-red-500">Returned Pieces</p>
+                                    <p className="mt-2 text-sm font-semibold text-red-700">
+                                        {sale.return_summary?.returned_quantity_pieces || 0}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-red-500">Returned Company Disc.</p>
+                                    <p className="mt-2 text-sm font-semibold text-red-700">
+                                        {formatCurrency(sale.return_summary?.returned_company_discount || 0)}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-red-500">Returned Dealer Disc.</p>
+                                    <p className="mt-2 text-sm font-semibold text-red-700">
+                                        {formatCurrency(sale.return_summary?.returned_dealer_discount || 0)}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-red-100 bg-red-50 p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-red-500">Returned Commission</p>
+                                    <p className="mt-2 text-sm font-semibold text-red-700">
+                                        {formatCurrency(sale.return_summary?.returned_company_commission || 0)}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-red-100 bg-red-50 p-4 md:col-span-3 xl:col-span-2">
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-red-500">Returned P/L</p>
+                                    <p className="mt-2 text-sm font-semibold text-red-700">
+                                        {formatCurrency(sale.return_summary?.returned_profit_loss || 0)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mb-6 overflow-x-auto rounded-lg border border-gray-200">
                         <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
                             <thead className="border-b border-gray-200 bg-gray-100">
                                 <tr className="divide-x divide-gray-200">
