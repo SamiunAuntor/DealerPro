@@ -25,7 +25,7 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                 </div>
 
                 <div className="space-y-5 overflow-y-auto p-6">
-                    <div className="grid gap-4 md:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-6">
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Customer</p>
                             <p className="mt-2 text-sm font-semibold text-gray-800">{sale.customer_snapshot?.name}</p>
@@ -40,9 +40,58 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                             <p className="mt-2 text-sm font-semibold text-gray-800">{formatCurrency(sale.total_amount)}</p>
                         </div>
                         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Dealer Discount</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">{formatCurrency(sale.total_dealer_discount || 0)}</p>
+                            <p className="text-xs text-gray-500">
+                                From subtotal {formatCurrency(sale.subtotal_after_company_discount || 0)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                             <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Profit / Loss</p>
                             <p className={`mt-2 text-sm font-semibold ${sale.profit_loss < 0 ? "text-red-600" : "text-emerald-600"}`}>
                                 {formatCurrency(sale.profit_loss)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Return Status</p>
+                            <p className="mt-2 text-sm font-semibold capitalize text-gray-800">
+                                {String(sale.return_status || "not_returned").replaceAll("_", " ")}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                                Refunded {formatCurrency(sale.return_summary?.returned_amount || 0)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-4">
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Pieces</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">
+                                {sale.return_summary?.returned_quantity_pieces || 0}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Company Disc.</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">
+                                {formatCurrency(sale.return_summary?.returned_company_discount || 0)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Dealer Disc.</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">
+                                {formatCurrency(sale.return_summary?.returned_dealer_discount || 0)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned Commission</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">
+                                {formatCurrency(sale.return_summary?.returned_company_commission || 0)}
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Returned P/L</p>
+                            <p className="mt-2 text-sm font-semibold text-gray-800">
+                                {formatCurrency(sale.return_summary?.returned_profit_loss || 0)}
                             </p>
                         </div>
                     </div>
@@ -54,9 +103,9 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Product</th>
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Quantity</th>
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Pieces</th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Returned</th>
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Gross</th>
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Company Disc.</th>
-                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Dealer Disc.</th>
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Final</th>
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">P/L</th>
                                 </tr>
@@ -69,9 +118,9 @@ function SaleInvoiceDetailsModal({ isOpen, sale, onClose }) {
                                             {item.quantity} {formatUnitLabel(item.unit_type)}
                                         </td>
                                         <td className="px-3 py-2 text-center text-sm text-gray-600">{item.quantity_pieces}</td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-600">{item.returned_quantity_pieces || 0}</td>
                                         <td className="px-3 py-2 text-center text-sm text-gray-600">{formatCurrency(item.gross_amount)}</td>
                                         <td className="px-3 py-2 text-center text-sm text-gray-600">{formatCurrency(item.company_discount_amount)}</td>
-                                        <td className="px-3 py-2 text-center text-sm text-gray-600">{formatCurrency(item.allocated_dealer_discount_amount)}</td>
                                         <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">{formatCurrency(item.final_amount)}</td>
                                         <td className={`px-3 py-2 text-center text-sm font-semibold ${item.profit_loss < 0 ? "text-red-600" : "text-emerald-600"}`}>
                                             {formatCurrency(item.profit_loss)}

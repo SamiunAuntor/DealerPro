@@ -19,12 +19,12 @@ function getCustomerToken(customer) {
     return nameToken || "CUST";
 }
 
-async function generateInvoiceNumber(customer, now = new Date()) {
+async function generateDocumentNumber({ scope, prefix, customer, now = new Date() }) {
     const dateKey = getDateKey(now);
     const countersCollection = getCollection("invoice_counters");
 
     const counter = await countersCollection.findOneAndUpdate(
-        { _id: `sales:${dateKey}` },
+        { _id: `${scope}:${dateKey}` },
         { $inc: { sequence: 1 }, $setOnInsert: { created_at: now } },
         { upsert: true, returnDocument: "after" }
     );
@@ -32,9 +32,28 @@ async function generateInvoiceNumber(customer, now = new Date()) {
     const sequence = String(counter.sequence).padStart(4, "0");
     const customerToken = getCustomerToken(customer);
 
-    return `INV-${dateKey}-${sequence}-${customerToken}`;
+    return `${prefix}-${dateKey}-${sequence}-${customerToken}`;
+}
+
+async function generateInvoiceNumber(customer, now = new Date()) {
+    return generateDocumentNumber({
+        scope: "sales",
+        prefix: "INV",
+        customer,
+        now,
+    });
+}
+
+async function generateReturnNumber(customer, now = new Date()) {
+    return generateDocumentNumber({
+        scope: "returns",
+        prefix: "RTN",
+        customer,
+        now,
+    });
 }
 
 module.exports = {
     generateInvoiceNumber,
+    generateReturnNumber,
 };

@@ -75,7 +75,7 @@ function POSPage() {
     }, [customersQuery.data, effectiveSelectedCustomerId]);
 
     const previewItems = useMemo(() => {
-        const draftItems = saleItems
+        const items = saleItems
             .map((item) => {
                 const product = productMap.get(item.product_id);
 
@@ -101,7 +101,6 @@ function POSPage() {
                         quantity: item.quantity,
                         unitType: item.unit_type,
                     }),
-                    dealerDiscountShareAmount: 0,
                     hasInvalidQuantity,
                     hasInvalidConversion,
                     hasInsufficientStock,
@@ -109,13 +108,13 @@ function POSPage() {
             })
             .filter(Boolean);
 
-        const validDraftItems = draftItems.filter(
+        const validItems = items.filter(
             (item) =>
                 !item.hasInvalidQuantity &&
                 !item.hasInvalidConversion &&
                 !item.hasInsufficientStock
         );
-        const totalNetBeforeDealer = validDraftItems.reduce(
+        const totalNetBeforeDealer = validItems.reduce(
             (sum, item) => sum + item.preview.netBeforeDealerDiscount,
             0
         );
@@ -124,49 +123,9 @@ function POSPage() {
             totalNetBeforeDealer
         );
 
-        const items = draftItems.reduce(
-            (state, item) => {
-                let dealerDiscountShare = 0;
-                const validItemIndex = validDraftItems.findIndex(
-                    (draftItem) => draftItem.product_id === item.product_id
-                );
-
-                if (validItemIndex !== -1 && totalNetBeforeDealer > 0) {
-                    if (validItemIndex === validDraftItems.length - 1) {
-                        dealerDiscountShare =
-                            effectiveDealerDiscountAmount - state.allocatedSoFar;
-                    } else {
-                        dealerDiscountShare = Number(
-                            (
-                                (item.preview.netBeforeDealerDiscount / totalNetBeforeDealer) *
-                                effectiveDealerDiscountAmount
-                            ).toFixed(2)
-                        );
-                    }
-                }
-
-                return {
-                    allocatedSoFar: state.allocatedSoFar + dealerDiscountShare,
-                    items: [
-                        ...state.items,
-                        {
-                            ...item,
-                            dealerDiscountShareAmount: dealerDiscountShare,
-                            preview: calculateSalePreview({
-                                product: item.product,
-                                quantity: item.quantity,
-                                unitType: item.unit_type,
-                                dealerDiscountShare,
-                            }),
-                        },
-                    ],
-                };
-            },
-            { allocatedSoFar: 0, items: [] }
-        ).items;
-
         return {
             items,
+            totalNetBeforeDealer,
             effectiveDealerDiscountAmount,
         };
     }, [dealerDiscountAmount, productMap, saleItems]);
@@ -188,13 +147,13 @@ function POSPage() {
                     item.hasInsufficientStock
                         ? 0
                         : item.preview.companyDiscountAmount),
-                finalAmount:
-                    summary.finalAmount +
+                subtotalAfterCompanyDiscount:
+                    summary.subtotalAfterCompanyDiscount +
                     (item.hasInvalidQuantity ||
                     item.hasInvalidConversion ||
                     item.hasInsufficientStock
                         ? 0
-                        : item.preview.finalAmount),
+                        : item.preview.netBeforeDealerDiscount),
                 profitLoss:
                     summary.profitLoss +
                     (item.hasInvalidQuantity ||
@@ -206,11 +165,24 @@ function POSPage() {
             {
                 grossAmount: 0,
                 companyDiscountAmount: 0,
-                finalAmount: 0,
+                subtotalAfterCompanyDiscount: 0,
                 profitLoss: 0,
             }
         );
     }, [previewItems]);
+
+    const finalInvoiceAmount = useMemo(
+        () =>
+            Number(
+                (totals.subtotalAfterCompanyDiscount || 0) -
+                    (previewItems.effectiveDealerDiscountAmount || 0)
+            ),
+        [previewItems.effectiveDealerDiscountAmount, totals.subtotalAfterCompanyDiscount]
+    );
+    const finalProfitLoss = useMemo(
+        () => Number((totals.profitLoss || 0) - (previewItems.effectiveDealerDiscountAmount || 0)),
+        [previewItems.effectiveDealerDiscountAmount, totals.profitLoss]
+    );
 
     const hasInvalidSaleState = previewItems.items.some(
         (item) =>
@@ -419,7 +391,7 @@ function POSPage() {
                                     Final Amount
                                 </p>
                                 <p className="mt-2 text-xl font-black text-gray-900">
-                                    {formatCurrency(totals.finalAmount)}
+                                    {formatCurrency(finalInvoiceAmount)}
                                 </p>
                             </div>
 
@@ -429,10 +401,10 @@ function POSPage() {
                                 </p>
                                 <p
                                     className={`mt-2 text-lg font-black ${
-                                        totals.profitLoss < 0 ? "text-red-600" : "text-emerald-600"
+                                        finalProfitLoss < 0 ? "text-red-600" : "text-emerald-600"
                                     }`}
                                 >
-                                    {formatCurrency(totals.profitLoss)}
+                                    {formatCurrency(finalProfitLoss)}
                                 </p>
                             </div>
                         </div>

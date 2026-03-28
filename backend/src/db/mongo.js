@@ -28,6 +28,9 @@ async function ensureIndexes() {
     await db.collection("sales").createIndex({ invoice_number: 1 }, { unique: true });
     await db.collection("sales").createIndex({ customer_id: 1, created_at: -1 });
     await db.collection("sales").createIndex({ channel: 1, created_at: -1 });
+    await db.collection("returns").createIndex({ return_number: 1 }, { unique: true });
+    await db.collection("returns").createIndex({ original_sale_id: 1, created_at: -1 });
+    await db.collection("returns").createIndex({ customer_id: 1, created_at: -1 });
 }
 
 async function ensureWalkInCustomer() {

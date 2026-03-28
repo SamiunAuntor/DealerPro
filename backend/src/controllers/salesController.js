@@ -41,8 +41,18 @@ async function getSale(req, res) {
     }
 }
 
+async function getCompanyDueSummary(req, res) {
+    try {
+        const summary = await salesService.getCompanyDueSummary(req.query);
+        return res.json(summary);
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to fetch company due summary");
+    }
+}
+
 module.exports = {
     createSale,
     getSales,
     getSale,
+    getCompanyDueSummary,
 };

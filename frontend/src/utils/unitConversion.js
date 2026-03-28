@@ -60,14 +60,13 @@ export function getPiecesPerUnit(product, unitType) {
     return 1;
 }
 
-export function calculateSalePreview({ product, quantity, unitType, dealerDiscountShare = 0 }) {
+export function calculateSalePreview({ product, quantity, unitType }) {
     const quantityPieces = convertToPieces(product, quantity, unitType);
     const salePricePerPiece = Number(product.selling_price) || 0;
     const purchasePricePerPiece = Number(product.purchase_price) || 0;
     const grossAmount = salePricePerPiece * quantityPieces;
     const companyDiscountAmount = grossAmount * ((Number(product.company_discount) || 0) / 100);
     const netBeforeDealerDiscount = grossAmount - companyDiscountAmount;
-    const finalAmount = netBeforeDealerDiscount - (Number(dealerDiscountShare) || 0);
     const costAmount = purchasePricePerPiece * quantityPieces;
 
     return {
@@ -77,7 +76,7 @@ export function calculateSalePreview({ product, quantity, unitType, dealerDiscou
         grossAmount,
         companyDiscountAmount,
         netBeforeDealerDiscount,
-        finalAmount,
-        profitLoss: finalAmount - costAmount,
+        finalAmount: netBeforeDealerDiscount,
+        profitLoss: netBeforeDealerDiscount - costAmount,
     };
 }

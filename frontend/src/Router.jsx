@@ -5,6 +5,7 @@ import InventoryPage from "./Pages/InventoryPage";
 import CustomersPage from "./Pages/CustomersPage";
 import POSPage from "./Pages/POSPage";
 import SalesHistoryPage from "./Pages/SalesHistoryPage";
+import CompanyDuePage from "./Pages/CompanyDuePage";
 
 const router = createBrowserRouter([
     {
@@ -33,7 +34,7 @@ const router = createBrowserRouter([
             },
             {
                 path: "company-due",
-                element: <h1>Company Due Section</h1>,
+                element: <CompanyDuePage />,
             },
             {
                 path: "analytics",

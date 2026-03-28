@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, RotateCcw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import useAxios from "../Hooks/UseAxios";
 import SaleInvoiceDetailsModal from "../Componenets/SaleInvoiceDetailsModal";
+import ReturnSaleModal from "../Componenets/ReturnSaleModal";
 import { formatCurrency } from "../utils/unitConversion";
 
 function formatDateTime(value) {
@@ -22,6 +23,7 @@ function formatDateTime(value) {
 function SalesHistoryPage() {
     const axios = useAxios();
     const [selectedSale, setSelectedSale] = useState(null);
+    const [saleToReturn, setSaleToReturn] = useState(null);
     const [historyFilters, setHistoryFilters] = useState({
         customer_id: "",
         channel: "",
@@ -58,6 +60,30 @@ function SalesHistoryPage() {
 
         return walkInCustomer ? [walkInCustomer, ...regularCustomers] : regularCustomers;
     }, [customersQuery.data]);
+
+    const getReturnStatusLabel = (status) => {
+        if (status === "fully_returned") {
+            return "Full";
+        }
+
+        if (status === "partially_returned") {
+            return "Partial";
+        }
+
+        return "Not Returned";
+    };
+
+    const getReturnStatusClassName = (status) => {
+        if (status === "fully_returned") {
+            return "bg-red-50 text-red-600";
+        }
+
+        if (status === "partially_returned") {
+            return "bg-amber-50 text-amber-600";
+        }
+
+        return "bg-gray-100 text-gray-600";
+    };
 
     return (
         <div className="flex h-full w-full flex-col gap-4 bg-white p-3">
@@ -137,6 +163,9 @@ function SalesHistoryPage() {
                                     Profit / Loss
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                    Return
+                                </th>
+                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
                                     Created
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
@@ -147,14 +176,14 @@ function SalesHistoryPage() {
                         <tbody className="divide-y divide-gray-200">
                             {salesQuery.isLoading && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
+                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={8}>
                                         Loading sales...
                                     </td>
                                 </tr>
                             )}
                             {!salesQuery.isLoading && (salesQuery.data || []).length === 0 && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
+                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={8}>
                                         No sales found for the selected filters.
                                     </td>
                                 </tr>
@@ -180,17 +209,36 @@ function SalesHistoryPage() {
                                     >
                                         {formatCurrency(sale.profit_loss)}
                                     </td>
+                                    <td className="px-3 py-2 text-center">
+                                        <span
+                                            className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wider ${getReturnStatusClassName(
+                                                sale.return_status
+                                            )}`}
+                                        >
+                                            {getReturnStatusLabel(sale.return_status)}
+                                        </span>
+                                    </td>
                                     <td className="px-3 py-2 text-center text-sm text-gray-600">
                                         {formatDateTime(sale.created_at)}
                                     </td>
                                     <td className="px-3 py-2 text-center">
-                                        <button
-                                            className="p-1 text-blue-500"
-                                            onClick={() => setSelectedSale(sale)}
-                                            type="button"
-                                        >
-                                            <Eye size={16} />
-                                        </button>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button
+                                                className="p-1 text-blue-500"
+                                                onClick={() => setSelectedSale(sale)}
+                                                type="button"
+                                            >
+                                                <Eye size={16} />
+                                            </button>
+                                            <button
+                                                className="p-1 text-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                                disabled={sale.return_status === "fully_returned"}
+                                                onClick={() => setSaleToReturn(sale)}
+                                                type="button"
+                                            >
+                                                <RotateCcw size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -204,6 +252,14 @@ function SalesHistoryPage() {
                 onClose={() => setSelectedSale(null)}
                 sale={selectedSale}
             />
+            {saleToReturn && (
+                <ReturnSaleModal
+                    key={saleToReturn._id}
+                    isOpen={Boolean(saleToReturn)}
+                    onClose={() => setSaleToReturn(null)}
+                    sale={saleToReturn}
+                />
+            )}
         </div>
     );
 }
