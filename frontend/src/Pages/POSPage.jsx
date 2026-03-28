@@ -24,7 +24,7 @@ function POSPage() {
 
     const [selectedCustomerId, setSelectedCustomerId] = useState("");
     const [productToAddId, setProductToAddId] = useState("");
-    const [dealerDiscountAmount, setDealerDiscountAmount] = useState(0);
+    const [dealerDiscountAmount, setDealerDiscountAmount] = useState("");
     const [saleItems, setSaleItems] = useState([]);
 
     const customersQuery = useQuery({
@@ -200,7 +200,7 @@ function POSPage() {
             ]);
 
             setSaleItems([]);
-            setDealerDiscountAmount(0);
+            setDealerDiscountAmount("");
             setProductToAddId("");
 
             if (!isCustomerLocked) {
@@ -319,7 +319,7 @@ function POSPage() {
     };
 
     return (
-        <div className="flex h-full w-full flex-col gap-4 bg-white p-3">
+        <div className="flex min-h-full w-full flex-col gap-4 bg-white p-3 pb-6">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
                     <div>
@@ -605,11 +605,12 @@ function POSPage() {
                                     Dealer Discount
                                 </label>
                                 <input
-                                    className="w-full rounded border border-gray-200 bg-gray-50 p-2.5 text-sm font-semibold outline-none focus:border-[#3cc720]"
+                                    className="w-full rounded border border-gray-200 bg-gray-50 p-2.5 text-sm font-semibold outline-none placeholder:font-medium placeholder:text-gray-400 focus:border-[#3cc720]"
                                     min="0"
                                     onChange={(event) =>
-                                        setDealerDiscountAmount(Number(event.target.value) || 0)
+                                        setDealerDiscountAmount(event.target.value)
                                     }
+                                    placeholder="Enter discount amount"
                                     type="number"
                                     value={dealerDiscountAmount}
                                 />

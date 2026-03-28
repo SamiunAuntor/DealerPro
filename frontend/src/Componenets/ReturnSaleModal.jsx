@@ -16,7 +16,7 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
     const [returnItems, setReturnItems] = useState(() =>
         (sale?.items || []).map((item) => ({
             product_id: item.product_id,
-            quantity: 0,
+            quantity: "",
             unit_type: item.unit_type || "pieces",
         }))
     );
@@ -44,7 +44,7 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
             const draft = returnItems.find(
                 (item) => String(item.product_id) === String(saleItem.product_id)
             ) || {
-                quantity: 0,
+                quantity: "",
                 unit_type: saleItem.unit_type || "pieces",
             };
 
@@ -229,7 +229,7 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
                 String(item.product_id) === String(productId)
                     ? {
                           ...item,
-                          [field]: field === "quantity" ? Number(value) || 0 : value,
+                          [field]: field === "quantity" ? value : value,
                       }
                     : item
             )
@@ -423,7 +423,7 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
                                         </td>
                                         <td className="px-3 py-2">
                                             <input
-                                                className="w-full rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
+                                                className="w-full rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none placeholder:font-medium placeholder:text-gray-400 focus:border-[#3cc720]"
                                                 min="0"
                                                 onChange={(event) =>
                                                     handleItemChange(
@@ -432,6 +432,7 @@ function ReturnSaleModal({ isOpen, sale, onClose }) {
                                                         event.target.value
                                                     )
                                                 }
+                                                placeholder="0"
                                                 type="number"
                                                 value={row.draft.quantity}
                                             />
