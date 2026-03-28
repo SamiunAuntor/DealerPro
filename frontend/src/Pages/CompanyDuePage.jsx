@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { jsPDF } from "jspdf";
 import Swal from "sweetalert2";
 import useAxios from "../Hooks/UseAxios";
 import { formatCurrency } from "../utils/unitConversion";
@@ -132,6 +133,196 @@ function CompanyDuePage() {
             cutoff_sale_id: selectedSettlementSale._id,
             note: settlementNote,
         });
+    };
+
+    const handleDownloadSettlementReport = async (settlement) => {
+        try {
+            const response = await axios.get(`/sales/company-due/settlements/${settlement._id}/report`);
+            const report = response.data;
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const marginX = 14;
+            const usableWidth = pageWidth - marginX * 2;
+            let y = 18;
+
+            const ensureSpace = (requiredHeight = 10) => {
+                if (y + requiredHeight <= pageHeight - 14) {
+                    return;
+                }
+
+                doc.addPage();
+                y = 18;
+            };
+
+            const addSummaryLine = (label, value = "") => {
+                ensureSpace(8);
+                doc.setFont("helvetica", "bold");
+                doc.text(`${label}:`, marginX, y);
+                doc.setFont("helvetica", "normal");
+                doc.text(String(value), 70, y);
+                y += 7;
+            };
+
+            const drawTable = (title, columns, rows) => {
+                ensureSpace(18);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(11);
+                doc.text(title, marginX, y);
+                y += 6;
+
+                const headerHeight = 8;
+                const lineHeight = 6;
+                const totalRequestedWidth = columns.reduce((sum, column) => sum + column.width, 0);
+                const normalizedColumns = columns.map((column) => ({
+                    ...column,
+                    width: (column.width / totalRequestedWidth) * usableWidth,
+                }));
+
+                const drawHeader = () => {
+                    doc.setFillColor(243, 244, 246);
+                    doc.rect(marginX, y, usableWidth, headerHeight, "F");
+                    doc.setDrawColor(220, 224, 230);
+                    doc.rect(marginX, y, usableWidth, headerHeight);
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(8);
+
+                    let x = marginX;
+                    normalizedColumns.forEach((column) => {
+                        doc.text(column.header, x + 2, y + 5.2);
+                        x += column.width;
+                    });
+
+                    y += headerHeight;
+                };
+
+                drawHeader();
+
+                if (rows.length === 0) {
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(8);
+                    doc.rect(marginX, y, usableWidth, 10);
+                    doc.text("No data available", marginX + 2, y + 6);
+                    y += 12;
+                    return;
+                }
+
+                rows.forEach((row) => {
+                    const cellLines = normalizedColumns.map((column) =>
+                        doc.splitTextToSize(String(row[column.key] ?? "-"), column.width - 4)
+                    );
+                    const rowHeight =
+                        Math.max(...cellLines.map((lines) => lines.length), 1) * lineHeight + 2;
+
+                    ensureSpace(rowHeight + 2);
+
+                    if (y + rowHeight > pageHeight - 14) {
+                        doc.addPage();
+                        y = 18;
+                        drawHeader();
+                    }
+
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(8);
+                    let x = marginX;
+
+                    normalizedColumns.forEach((column, index) => {
+                        doc.rect(x, y, column.width, rowHeight);
+                        doc.text(cellLines[index], x + 2, y + 5);
+                        x += column.width;
+                    });
+
+                    y += rowHeight;
+                });
+
+                y += 6;
+            };
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(16);
+            doc.text("Company Due Settlement Report", marginX, y);
+            y += 10;
+
+            doc.setFontSize(10);
+            addSummaryLine("Settled At", formatDateTime(report.settlement.settled_at));
+            addSummaryLine("Covered Through", report.settlement.cutoff_invoice_number);
+            addSummaryLine("Gross Commission", formatCurrency(report.settlement.gross_company_commission));
+            addSummaryLine("Refunded Commission", formatCurrency(report.settlement.refunded_company_commission));
+            addSummaryLine("Net Settled Amount", formatCurrency(report.settlement.net_settled_amount));
+            addSummaryLine("Sales Count", report.settlement.sales_count);
+            addSummaryLine("Returns Count", report.settlement.returns_count);
+            addSummaryLine("Note", report.settlement.note || "-");
+
+            y += 2;
+
+            drawTable(
+                "Outstanding Commission Breakdown",
+                [
+                    { header: "Product", key: "product_name", width: 40 },
+                    { header: "Code", key: "product_code", width: 24 },
+                    { header: "Comm/Piece", key: "company_commission_per_piece", width: 28 },
+                    { header: "Pieces", key: "total_quantity_pieces", width: 20 },
+                    { header: "Gross", key: "gross_company_commission", width: 26 },
+                    { header: "Refunded", key: "refunded_company_commission", width: 26 },
+                    { header: "Claimable", key: "total_company_commission", width: 26 },
+                ],
+                report.by_product.map((row) => ({
+                    product_name: row.product_name,
+                    product_code: row.product_code,
+                    company_commission_per_piece: formatCurrency(row.company_commission_per_piece),
+                    total_quantity_pieces: row.total_quantity_pieces,
+                    gross_company_commission: formatCurrency(row.gross_company_commission),
+                    refunded_company_commission: formatCurrency(row.refunded_company_commission),
+                    total_company_commission: formatCurrency(row.total_company_commission),
+                }))
+            );
+
+            drawTable(
+                "Included Sales",
+                [
+                    { header: "Invoice", key: "invoice_number", width: 42 },
+                    { header: "Customer", key: "customer_name", width: 34 },
+                    { header: "Created", key: "created_at", width: 40 },
+                    { header: "Amount", key: "total_amount", width: 28 },
+                    { header: "Commission", key: "total_company_commission", width: 36 },
+                ],
+                report.included_sales.map((sale) => ({
+                    invoice_number: sale.invoice_number,
+                    customer_name: getDisplayCustomerName(sale.customer_snapshot?.name),
+                    created_at: formatDateTime(sale.created_at),
+                    total_amount: formatCurrency(sale.total_amount),
+                    total_company_commission: formatCurrency(sale.total_company_commission),
+                }))
+            );
+
+            drawTable(
+                "Included Returns",
+                [
+                    { header: "Return", key: "return_number", width: 36 },
+                    { header: "Sale", key: "original_invoice_number", width: 42 },
+                    { header: "Created", key: "created_at", width: 38 },
+                    { header: "Refund", key: "total_amount_refunded", width: 28 },
+                    { header: "Commission Reversed", key: "total_company_commission_refunded", width: 46 },
+                ],
+                report.included_returns.map((returnRecord) => ({
+                    return_number: returnRecord.return_number,
+                    original_invoice_number: returnRecord.original_invoice_number,
+                    created_at: formatDateTime(returnRecord.created_at),
+                    total_amount_refunded: formatCurrency(returnRecord.total_amount_refunded),
+                    total_company_commission_refunded: formatCurrency(
+                        returnRecord.total_company_commission_refunded
+                    ),
+                }))
+            );
+
+            doc.save(`company-due-settlement-${report.settlement.cutoff_invoice_number}.pdf`);
+        } catch (error) {
+            Swal.fire(
+                "Error",
+                error.response?.data?.message || "Failed to download settlement report.",
+                "error"
+            );
+        }
     };
 
     return (
@@ -472,12 +663,15 @@ function CompanyDuePage() {
                                     <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
                                         Note
                                     </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Action
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
                                 {settlements.length === 0 && (
                                     <tr>
-                                        <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
+                                        <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
                                             No company due settlements recorded yet.
                                         </td>
                                     </tr>
@@ -501,6 +695,15 @@ function CompanyDuePage() {
                                         </td>
                                         <td className="px-3 py-2 text-sm text-gray-600">
                                             {settlement.note || "-"}
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                            <button
+                                                className="rounded border border-gray-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-gray-700 transition hover:border-[#3cc720] hover:text-[#111827]"
+                                                onClick={() => handleDownloadSettlementReport(settlement)}
+                                                type="button"
+                                            >
+                                                Download Report
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}

@@ -72,6 +72,15 @@ async function createCompanyDueSettlement(req, res) {
     }
 }
 
+async function getCompanyDueSettlementReport(req, res) {
+    try {
+        const report = await companyDueSettlementService.getSettlementReport(req.params.id);
+        return res.json(report);
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to fetch settlement report");
+    }
+}
+
 module.exports = {
     createSale,
     getSales,
@@ -79,4 +88,5 @@ module.exports = {
     getCompanyDueSummary,
     getCompanyDueSettlements,
     createCompanyDueSettlement,
+    getCompanyDueSettlementReport,
 };

@@ -118,6 +118,24 @@ async function listSettlements() {
     return getSettlementsCollection().find({}).sort({ settled_at: -1, _id: -1 }).toArray();
 }
 
+async function getSettlementById(id) {
+    if (!ObjectId.isValid(id)) {
+        const error = new Error("Invalid settlement ID");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const settlement = await getSettlementsCollection().findOne({ _id: new ObjectId(id) });
+
+    if (!settlement) {
+        const error = new Error("Settlement not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    return settlement;
+}
+
 async function listSettlementOptions() {
     const latestSettlement = await getLatestSettlementBoundary();
     const unsettledSalesMatch = buildSalesAfterSettlementMatch(latestSettlement);
@@ -407,9 +425,134 @@ async function getOutstandingCompanyDueSummary(filters = {}) {
     };
 }
 
+async function getSettlementReport(id) {
+    const settlement = await getSettlementById(id);
+    const previousSettlement = await getSettlementsCollection()
+        .find({
+            settled_at: { $lt: settlement.settled_at },
+        })
+        .sort({ settled_at: -1, _id: -1 })
+        .limit(1)
+        .next();
+
+    const salesMatch = mergeMatch(
+        buildSalesAfterSettlementMatch(previousSettlement),
+        buildSalesUpToCutoffMatch(settlement)
+    );
+    const returnsMatch = mergeMatch(
+        buildReturnsAfterSettlementMatch(previousSettlement),
+        buildReturnsUpToCutoffMatch(settlement)
+    );
+
+    const [byProduct, includedSales, includedReturns, refundedByProduct] = await Promise.all([
+        getSalesCollection()
+            .aggregate([
+                { $match: salesMatch },
+                { $unwind: "$items" },
+                {
+                    $group: {
+                        _id: "$items.product_id",
+                        product_code: { $first: "$items.product_code" },
+                        product_name: { $first: "$items.product_name" },
+                        company_commission_per_piece: {
+                            $first: "$items.company_commission_per_piece",
+                        },
+                        gross_company_commission: {
+                            $sum: "$items.company_commission_amount",
+                        },
+                        total_quantity_pieces: { $sum: "$items.quantity_pieces" },
+                        total_sales_count: { $sum: 1 },
+                    },
+                },
+                { $sort: { gross_company_commission: -1, product_name: 1 } },
+            ])
+            .toArray(),
+        getSalesCollection()
+            .find(salesMatch)
+            .project({
+                invoice_number: 1,
+                created_at: 1,
+                customer_snapshot: 1,
+                channel: 1,
+                total_company_commission: 1,
+                total_amount: 1,
+            })
+            .sort({ created_at: 1, _id: 1 })
+            .toArray(),
+        getReturnsCollection()
+            .find(returnsMatch)
+            .project({
+                return_number: 1,
+                created_at: 1,
+                original_invoice_number: 1,
+                total_company_commission_refunded: 1,
+                total_amount_refunded: 1,
+            })
+            .sort({ created_at: 1, _id: 1 })
+            .toArray(),
+        getReturnsCollection()
+            .aggregate([
+                { $match: returnsMatch },
+                { $unwind: "$items" },
+                {
+                    $group: {
+                        _id: "$items.product_id",
+                        total_company_commission_refunded: {
+                            $sum: "$items.company_commission_amount_refunded",
+                        },
+                    },
+                },
+            ])
+            .toArray(),
+    ]);
+
+    const refundedByProductMap = new Map(
+        refundedByProduct.map((item) => [
+            String(item._id),
+            roundMoney(item.total_company_commission_refunded || 0),
+        ])
+    );
+
+    return {
+        settlement: {
+            ...settlement,
+            gross_company_commission: roundMoney(settlement.gross_company_commission || 0),
+            refunded_company_commission: roundMoney(settlement.refunded_company_commission || 0),
+            net_settled_amount: roundMoney(settlement.net_settled_amount || 0),
+        },
+        by_product: byProduct.map((item) => {
+            const refundedCompanyCommission =
+                refundedByProductMap.get(String(item._id)) || 0;
+
+            return {
+                ...item,
+                gross_company_commission: roundMoney(item.gross_company_commission || 0),
+                refunded_company_commission: refundedCompanyCommission,
+                total_company_commission: roundMoney(
+                    roundMoney(item.gross_company_commission || 0) - refundedCompanyCommission
+                ),
+                company_commission_per_piece: roundMoney(item.company_commission_per_piece || 0),
+            };
+        }),
+        included_sales: includedSales.map((sale) => ({
+            ...sale,
+            total_company_commission: roundMoney(sale.total_company_commission || 0),
+            total_amount: roundMoney(sale.total_amount || 0),
+        })),
+        included_returns: includedReturns.map((returnRecord) => ({
+            ...returnRecord,
+            total_company_commission_refunded: roundMoney(
+                returnRecord.total_company_commission_refunded || 0
+            ),
+            total_amount_refunded: roundMoney(returnRecord.total_amount_refunded || 0),
+        })),
+    };
+}
+
 module.exports = {
     listSettlements,
     listSettlementOptions,
     createSettlement,
     getOutstandingCompanyDueSummary,
+    getSettlementReport,
 };
