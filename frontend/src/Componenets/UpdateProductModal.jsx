@@ -54,7 +54,7 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
         const { name, value } = e.target;
         const numericFields = [
             'company_commission', 'company_discount', 'pieces_per_packet',
-            'pieces_per_cartoon', 'purchase_price', 'selling_price'
+            'pieces_per_cartoon', 'purchase_price', 'selling_price', 'low_stock_threshold'
         ];
 
         setFormData(prev => ({
@@ -92,12 +92,13 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
                 pieces_per_cartoon: formData.pieces_per_cartoon,
                 purchase_price: formData.purchase_price,
                 selling_price: formData.selling_price,
+                low_stock_threshold: formData.low_stock_threshold,
             };
 
             // Ensure numeric consistency
             const numericFields = [
                 'company_commission', 'company_discount', 'pieces_per_packet',
-                'pieces_per_cartoon', 'purchase_price', 'selling_price'
+                'pieces_per_cartoon', 'purchase_price', 'selling_price', 'low_stock_threshold'
             ];
 
             numericFields.forEach(field => {
@@ -206,6 +207,10 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
 
                         <FormRow label="Pcs / Carton">
                             <input name="pieces_per_cartoon" value={formData.pieces_per_cartoon} onChange={handleChange} type="number" className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm font-bold" />
+                        </FormRow>
+
+                        <FormRow label="Low Stock Limit">
+                            <input name="low_stock_threshold" value={formData.low_stock_threshold ?? 20} onChange={handleChange} type="number" min="0" className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm font-bold focus:border-blue-500" />
                         </FormRow>
 
                         <FormRow label="Dealer Commission (৳)">

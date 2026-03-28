@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-    BarChart3,
     FileText,
     LayoutGrid,
     Menu,
@@ -25,7 +24,6 @@ function MainLayout({ children }) {
         { name: "POS", icon: <ShoppingCart size={22} />, href: "/pos" },
         { name: "Sales", icon: <FileText size={22} />, href: "/sales" },
         { name: "Company Due", icon: <Wallet size={22} />, href: "/company-due" },
-        { name: "Analytics", icon: <BarChart3 size={22} />, href: "/analytics" },
     ];
 
     useEffect(() => {
@@ -107,7 +105,7 @@ function MainLayout({ children }) {
 
                 <main className="relative flex-1 overflow-y-auto bg-white">
                     {children || (
-                        <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
+                        <div className="min-h-full p-4">
                             <Outlet />
                         </div>
                     )}

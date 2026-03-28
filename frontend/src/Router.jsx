@@ -6,6 +6,7 @@ import CustomersPage from "./Pages/CustomersPage";
 import POSPage from "./Pages/POSPage";
 import SalesHistoryPage from "./Pages/SalesHistoryPage";
 import CompanyDuePage from "./Pages/CompanyDuePage";
+import DashboardPage from "./Pages/DashboardPage";
 
 const router = createBrowserRouter([
     {
@@ -14,7 +15,7 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
-                element: <h1>Dashboard Home</h1>,
+                element: <DashboardPage />,
             },
             {
                 path: "inventory",
@@ -35,10 +36,6 @@ const router = createBrowserRouter([
             {
                 path: "company-due",
                 element: <CompanyDuePage />,
-            },
-            {
-                path: "analytics",
-                element: <h1>Analytics Section</h1>,
             },
         ],
     },

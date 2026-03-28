@@ -69,6 +69,21 @@ function InventoryPage() {
         }
     };
 
+    const getStockState = (product) => {
+        const currentStockPieces = Number(product.current_stock_pieces || 0);
+        const lowStockThreshold = Number(product.low_stock_threshold ?? 20);
+
+        if (currentStockPieces <= 0) {
+            return "out";
+        }
+
+        if (currentStockPieces <= lowStockThreshold) {
+            return "low";
+        }
+
+        return "normal";
+    };
+
     return (
         <div className="flex h-full w-full flex-col bg-white px-2 py-2">
             <div className="mb-3 flex flex-col items-start justify-between gap-3 px-1 sm:flex-row sm:items-center">
@@ -117,8 +132,23 @@ function InventoryPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {filteredProducts.map((product) => (
-                                <tr key={product._id} className="divide-x divide-gray-200 transition-colors hover:bg-gray-100">
+                            {filteredProducts.map((product) => {
+                                const stockState = getStockState(product);
+                                const rowClassName =
+                                    stockState === "out"
+                                        ? "bg-red-50 hover:bg-red-100"
+                                        : stockState === "low"
+                                          ? "bg-amber-50 hover:bg-amber-100"
+                                          : "hover:bg-gray-100";
+                                const stockTextClassName =
+                                    stockState === "out"
+                                        ? "text-red-600"
+                                        : stockState === "low"
+                                          ? "text-amber-600"
+                                          : "text-blue-600";
+
+                                return (
+                                <tr key={product._id} className={`divide-x divide-gray-200 transition-colors ${rowClassName}`}>
                                     <td className="px-2 py-1 text-center text-xs font-medium text-gray-700">{product.code}</td>
                                     <td className="px-2 py-1 text-center text-xs text-gray-500">{product.product_id}</td>
                                     <td className="px-2 py-1 text-center text-xs font-semibold text-gray-800">{product.name}</td>
@@ -131,7 +161,7 @@ function InventoryPage() {
                                     <td className="px-2 py-1 text-center text-xs font-medium text-gray-600">{formatCurrency(product.company_commission)}</td>
                                     <td className="px-2 py-1 text-center text-xs text-gray-600">{product.company_discount}%</td>
                                     <td className="px-2 py-1 text-center">
-                                        <span className={`text-xs font-bold ${product.stock_count < 20 ? "text-red-600" : "text-blue-600"}`}>
+                                        <span className={`text-xs font-bold ${stockTextClassName}`}>
                                             {getStockSummaryLabel(product.stock_summary)}
                                         </span>
                                     </td>
@@ -163,7 +193,8 @@ function InventoryPage() {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

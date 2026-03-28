@@ -19,6 +19,7 @@ function formatDateTime(value) {
 
 function CompanyDuePage() {
     const axios = useAxios();
+    const [activeTab, setActiveTab] = useState("breakdown");
     const [filters, setFilters] = useState({
         customer_id: "",
         channel: "",
@@ -68,10 +69,10 @@ function CompanyDuePage() {
     const recentSales = companyDueQuery.data?.recent_sales || [];
 
     return (
-        <div className="flex h-full w-full flex-col gap-4 bg-white p-3">
+        <div className="flex min-h-full w-full flex-col gap-4 bg-white p-3 pb-6">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
-                    <div>
+                    <div className="text-left">
                         <h1 className="text-xl font-black uppercase tracking-tight text-gray-900">
                             Company Due
                         </h1>
@@ -168,14 +169,6 @@ function CompanyDuePage() {
                     </div>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                         <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                            Pieces Sold
-                        </p>
-                        <p className="mt-2 text-xl font-semibold text-gray-900">
-                            {summary.total_quantity_pieces}
-                        </p>
-                    </div>
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                             Products Due
                         </p>
                         <p className="mt-2 text-xl font-semibold text-gray-900">
@@ -186,155 +179,176 @@ function CompanyDuePage() {
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="mb-3">
-                    <h2 className="text-sm font-black uppercase tracking-wide text-gray-900">
-                        Commission Breakdown
-                    </h2>
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="text-left">
+                        <h2 className="text-sm font-black uppercase tracking-wide text-gray-900">
+                            {activeTab === "breakdown" ? "Commission Breakdown" : "Recent Contributing Sales"}
+                        </h2>
+                    </div>
+
+                    <div className="inline-flex rounded-full border border-gray-200 bg-gray-50 p-1">
+                        <button
+                            className={`rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-wider transition ${
+                                activeTab === "breakdown"
+                                    ? "bg-[#111827] text-[#3cc720]"
+                                    : "text-gray-500 hover:text-gray-800"
+                            }`}
+                            onClick={() => setActiveTab("breakdown")}
+                            type="button"
+                        >
+                            Breakdown
+                        </button>
+                        <button
+                            className={`rounded-full px-4 py-2 text-[11px] font-black uppercase tracking-wider transition ${
+                                activeTab === "sales"
+                                    ? "bg-[#111827] text-[#3cc720]"
+                                    : "text-gray-500 hover:text-gray-800"
+                            }`}
+                            onClick={() => setActiveTab("sales")}
+                            type="button"
+                        >
+                            Recent Sales
+                        </button>
+                    </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
-                        <thead className="border-b border-gray-200 bg-gray-100">
-                            <tr className="divide-x divide-gray-200">
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Product
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Code
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Comm./Piece
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Pieces
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Sales Lines
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Refunded
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Claimable
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {companyDueQuery.isLoading && (
-                                <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
-                                        Loading company due summary...
-                                    </td>
+                {activeTab === "breakdown" ? (
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
+                            <thead className="border-b border-gray-200 bg-gray-100">
+                                <tr className="divide-x divide-gray-200">
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Product
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Code
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Comm./Piece
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Pieces
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Sales Lines
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Refunded
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Claimable
+                                    </th>
                                 </tr>
-                            )}
-                            {!companyDueQuery.isLoading && productRows.length === 0 && (
-                                <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
-                                        No claimable company commission found for the selected filters.
-                                    </td>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {companyDueQuery.isLoading && (
+                                    <tr>
+                                        <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
+                                            Loading company due summary...
+                                        </td>
+                                    </tr>
+                                )}
+                                {!companyDueQuery.isLoading && productRows.length === 0 && (
+                                    <tr>
+                                        <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={7}>
+                                            No claimable company commission found for the selected filters.
+                                        </td>
+                                    </tr>
+                                )}
+                                {productRows.map((row) => (
+                                    <tr key={String(row._id)} className="divide-x divide-gray-200">
+                                        <td className="px-3 py-2 text-sm font-semibold text-gray-800">
+                                            {row.product_name}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-600">
+                                            {row.product_code}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-600">
+                                            {formatCurrency(row.company_commission_per_piece)}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-600">
+                                            {row.total_quantity_pieces}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-600">
+                                            {row.total_sales_count}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm font-semibold text-red-600">
+                                            {formatCurrency(row.refunded_company_commission)}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm font-semibold text-gray-900">
+                                            {formatCurrency(row.total_company_commission)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
+                            <thead className="border-b border-gray-200 bg-gray-100">
+                                <tr className="divide-x divide-gray-200">
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Invoice
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Customer
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Channel
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Sale Amount
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Commission
+                                    </th>
+                                    <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                        Created
+                                    </th>
                                 </tr>
-                            )}
-                            {productRows.map((row) => (
-                                <tr key={String(row._id)} className="divide-x divide-gray-200">
-                                    <td className="px-3 py-2 text-sm font-semibold text-gray-800">
-                                        {row.product_name}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm text-gray-600">
-                                        {row.product_code}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm text-gray-600">
-                                        {formatCurrency(row.company_commission_per_piece)}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm text-gray-600">
-                                        {row.total_quantity_pieces}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm text-gray-600">
-                                        {row.total_sales_count}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm font-semibold text-red-600">
-                                        {formatCurrency(row.refunded_company_commission)}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm font-semibold text-gray-900">
-                                        {formatCurrency(row.total_company_commission)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <div className="mb-3">
-                    <h2 className="text-sm font-black uppercase tracking-wide text-gray-900">
-                        Recent Contributing Sales
-                    </h2>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
-                        <thead className="border-b border-gray-200 bg-gray-100">
-                            <tr className="divide-x divide-gray-200">
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Invoice
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Customer
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Channel
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Sale Amount
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Commission
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Created
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {companyDueQuery.isLoading && (
-                                <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
-                                        Loading recent sales...
-                                    </td>
-                                </tr>
-                            )}
-                            {!companyDueQuery.isLoading && recentSales.length === 0 && (
-                                <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
-                                        No sales found for the selected filters.
-                                    </td>
-                                </tr>
-                            )}
-                            {recentSales.map((sale) => (
-                                <tr key={sale._id} className="divide-x divide-gray-200">
-                                    <td className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
-                                        {sale.invoice_number}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm text-gray-700">
-                                        {sale.customer_snapshot?.name}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm capitalize text-gray-700">
-                                        {sale.channel}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">
-                                        {formatCurrency(sale.total_amount)}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm font-semibold text-gray-900">
-                                        {formatCurrency(sale.total_company_commission)}
-                                    </td>
-                                    <td className="px-3 py-2 text-center text-sm text-gray-600">
-                                        {formatDateTime(sale.created_at)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {companyDueQuery.isLoading && (
+                                    <tr>
+                                        <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
+                                            Loading recent sales...
+                                        </td>
+                                    </tr>
+                                )}
+                                {!companyDueQuery.isLoading && recentSales.length === 0 && (
+                                    <tr>
+                                        <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
+                                            No sales found for the selected filters.
+                                        </td>
+                                    </tr>
+                                )}
+                                {recentSales.map((sale) => (
+                                    <tr key={sale._id} className="divide-x divide-gray-200">
+                                        <td className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
+                                            {sale.invoice_number}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-700">
+                                            {sale.customer_snapshot?.name}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm capitalize text-gray-700">
+                                            {sale.channel}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">
+                                            {formatCurrency(sale.total_amount)}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm font-semibold text-gray-900">
+                                            {formatCurrency(sale.total_company_commission)}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-sm text-gray-600">
+                                            {formatDateTime(sale.created_at)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );

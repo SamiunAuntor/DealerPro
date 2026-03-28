@@ -5,6 +5,7 @@ const productRoutes = require("./routes/products");
 const customerRoutes = require("./routes/customers");
 const salesRoutes = require("./routes/sales");
 const returnRoutes = require("./routes/returns");
+const dashboardRoutes = require("./routes/dashboard");
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use("/products", productRoutes);
 app.use("/customers", customerRoutes);
 app.use("/sales", salesRoutes);
 app.use("/returns", returnRoutes);
+app.use("/dashboard", dashboardRoutes);
 
 app.get("/", (req, res) => {
     res.send("DealerPro backend running");

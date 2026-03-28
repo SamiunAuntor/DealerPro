@@ -27,6 +27,7 @@ const INITIAL_STATE = {
     pieces_per_cartoon: 0,
     purchase_price: 0,
     selling_price: 0,
+    low_stock_threshold: 20,
 };
 
 // 2. COMPONENT DECLARED OUTSIDE
@@ -64,7 +65,7 @@ const AddProductModal = ({ isOpen, onClose, onSuccess }) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        const numericFields = ['company_commission', 'company_discount', 'pieces_per_packet', 'pieces_per_cartoon', 'purchase_price', 'selling_price'];
+        const numericFields = ['company_commission', 'company_discount', 'pieces_per_packet', 'pieces_per_cartoon', 'purchase_price', 'selling_price', 'low_stock_threshold'];
 
         setFormData(prev => ({
             ...prev,
@@ -203,6 +204,10 @@ const AddProductModal = ({ isOpen, onClose, onSuccess }) => {
 
                         <FormRow label="Pcs / Carton">
                             <input name="pieces_per_cartoon" value={formData.pieces_per_cartoon} onChange={handleChange} type="number" className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none font-bold" />
+                        </FormRow>
+
+                        <FormRow label="Low Stock Limit">
+                            <input name="low_stock_threshold" value={formData.low_stock_threshold} onChange={handleChange} type="number" min="0" className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none font-bold focus:border-[#3cc720]" />
                         </FormRow>
 
                         <FormRow label="Company Commission (৳)">

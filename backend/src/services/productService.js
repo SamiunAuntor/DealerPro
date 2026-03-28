@@ -36,6 +36,10 @@ function normalizeProductPayload(payload = {}) {
         pieces_per_cartoon: Number(payload.pieces_per_cartoon) || 0,
         purchase_price: Number(payload.purchase_price) || 0,
         selling_price: Number(payload.selling_price) || 0,
+        low_stock_threshold:
+            Number.isFinite(Number(payload.low_stock_threshold)) && Number(payload.low_stock_threshold) >= 0
+                ? Number(payload.low_stock_threshold)
+                : 20,
     };
 }
 
@@ -47,6 +51,12 @@ function validateProductPayload(product) {
     }
 
     validateUnitType(product.unit_type);
+
+    if (!Number.isFinite(product.low_stock_threshold) || product.low_stock_threshold < 0) {
+        const error = new Error("Low stock threshold must be zero or greater");
+        error.statusCode = 400;
+        throw error;
+    }
 }
 
 function getLegacyStockPieces(product) {
@@ -69,10 +79,15 @@ function getCurrentStockPieces(product) {
 
 function serializeProduct(product) {
     const currentStockPieces = getCurrentStockPieces(product);
+    const lowStockThreshold =
+        Number.isFinite(Number(product.low_stock_threshold)) && Number(product.low_stock_threshold) >= 0
+            ? Number(product.low_stock_threshold)
+            : 20;
 
     return {
         ...product,
         unit_type: normalizeUnitType(product.unit_type || "pieces"),
+        low_stock_threshold: lowStockThreshold,
         current_stock_pieces: currentStockPieces,
         stock_count: currentStockPieces,
         stock_summary: buildStockSummary(product, currentStockPieces),

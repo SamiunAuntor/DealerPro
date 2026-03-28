@@ -86,7 +86,7 @@ function SalesHistoryPage() {
     };
 
     return (
-        <div className="flex h-full w-full flex-col gap-4 bg-white p-3">
+        <div className="flex min-h-full w-full flex-col gap-4 bg-white p-3 pb-6">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
                     <div>
