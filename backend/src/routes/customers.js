@@ -2,6 +2,7 @@ const express = require("express");
 const {
     getCustomers,
     getCustomer,
+    getWalkInCustomer,
     addCustomer,
     updateCustomer,
     deleteCustomer,
@@ -9,6 +10,7 @@ const {
 
 const router = express.Router();
 
+router.get("/walk-in", getWalkInCustomer);
 router.get("/", getCustomers);
 router.get("/:id", getCustomer);
 router.post("/", addCustomer);

@@ -3,6 +3,7 @@ const cors = require("cors");
 
 const productRoutes = require("./routes/products");
 const customerRoutes = require("./routes/customers");
+const salesRoutes = require("./routes/sales");
 
 const app = express();
 
@@ -11,6 +12,7 @@ app.use(express.json());
 
 app.use("/products", productRoutes);
 app.use("/customers", customerRoutes);
+app.use("/sales", salesRoutes);
 
 app.get("/", (req, res) => {
     res.send("DealerPro backend running");

@@ -1,5 +1,6 @@
 const { ObjectId } = require("mongodb");
 const { getCollection } = require("../db/mongo");
+const { WALK_IN_CUSTOMER_TAG } = require("../constants/systemCustomers");
 
 const COLLECTION_NAME = "customers";
 
@@ -15,17 +16,17 @@ function normalizeCustomerPayload(payload = {}) {
 }
 
 function validateCustomerPayload(payload) {
-    const errors = [];
-
     if (!payload.name) {
-        errors.push("Name is required");
+        const error = new Error("Name is required");
+        error.statusCode = 400;
+        throw error;
     }
 
     if (!payload.phone) {
-        errors.push("Phone is required");
+        const error = new Error("Phone is required");
+        error.statusCode = 400;
+        throw error;
     }
-
-    return errors;
 }
 
 function toObjectId(id) {
@@ -38,29 +39,33 @@ function toObjectId(id) {
     return new ObjectId(id);
 }
 
-function buildDuplicatePhoneError() {
-    const error = new Error("Phone number already exists");
-    error.statusCode = 409;
-    return error;
-}
-
 function handleMongoError(error) {
     if (error?.code === 11000) {
-        throw buildDuplicatePhoneError();
+        const normalizedError = new Error("Phone number already exists");
+        normalizedError.statusCode = 409;
+        throw normalizedError;
     }
 
     throw error;
 }
 
-async function listCustomers() {
+async function listCustomersWithOptions(options = {}) {
+    const query = options.includeSystem ? {} : { is_system: { $ne: true } };
+
     return getCustomerCollection()
-        .find({})
+        .find(query)
         .sort({ created_at: -1 })
         .toArray();
 }
 
-async function getCustomerById(id) {
-    const customer = await getCustomerCollection().findOne({ _id: toObjectId(id) });
+async function getCustomerById(id, options = {}) {
+    const query = { _id: toObjectId(id) };
+
+    if (!options.includeSystem) {
+        query.is_system = { $ne: true };
+    }
+
+    const customer = await getCustomerCollection().findOne(query);
 
     if (!customer) {
         const error = new Error("Customer not found");
@@ -71,26 +76,33 @@ async function getCustomerById(id) {
     return customer;
 }
 
-async function createCustomer(payload) {
-    const customer = normalizeCustomerPayload(payload);
-    const errors = validateCustomerPayload(customer);
+async function getWalkInCustomer() {
+    const customer = await getCustomerCollection().findOne({ system_tag: WALK_IN_CUSTOMER_TAG });
 
-    if (errors.length > 0) {
-        const error = new Error(errors[0]);
-        error.statusCode = 400;
+    if (!customer) {
+        const error = new Error("Walk-in customer is not configured");
+        error.statusCode = 500;
         throw error;
     }
+
+    return customer;
+}
+
+async function createCustomer(payload) {
+    const customer = normalizeCustomerPayload(payload);
+    validateCustomerPayload(customer);
 
     const now = new Date();
     const customerToInsert = {
         ...customer,
         created_at: now,
         updated_at: now,
+        is_system: false,
     };
 
     try {
         const result = await getCustomerCollection().insertOne(customerToInsert);
-        return getCustomerById(result.insertedId.toString());
+        return getCustomerById(result.insertedId.toString(), { includeSystem: true });
     } catch (error) {
         handleMongoError(error);
     }
@@ -98,17 +110,25 @@ async function createCustomer(payload) {
 
 async function updateCustomer(id, payload) {
     const customerId = toObjectId(id);
-    const customer = normalizeCustomerPayload(payload);
-    const errors = validateCustomerPayload(customer);
+    const existingCustomer = await getCustomerCollection().findOne({ _id: customerId });
 
-    if (errors.length > 0) {
-        const error = new Error(errors[0]);
-        error.statusCode = 400;
+    if (!existingCustomer) {
+        const error = new Error("Customer not found");
+        error.statusCode = 404;
         throw error;
     }
 
+    if (existingCustomer.is_system) {
+        const error = new Error("System customer cannot be edited");
+        error.statusCode = 409;
+        throw error;
+    }
+
+    const customer = normalizeCustomerPayload(payload);
+    validateCustomerPayload(customer);
+
     try {
-        const result = await getCustomerCollection().updateOne(
+        await getCustomerCollection().updateOne(
             { _id: customerId },
             {
                 $set: {
@@ -118,20 +138,37 @@ async function updateCustomer(id, payload) {
             }
         );
 
-        if (result.matchedCount === 0) {
-            const error = new Error("Customer not found");
-            error.statusCode = 404;
-            throw error;
-        }
-
-        return getCustomerById(id);
+        return getCustomerById(id, { includeSystem: true });
     } catch (error) {
         handleMongoError(error);
     }
 }
 
 async function deleteCustomer(id) {
-    const result = await getCustomerCollection().deleteOne({ _id: toObjectId(id) });
+    const customerId = toObjectId(id);
+    const customer = await getCustomerCollection().findOne({ _id: customerId });
+
+    if (!customer) {
+        const error = new Error("Customer not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (customer.is_system) {
+        const error = new Error("System customer cannot be deleted");
+        error.statusCode = 409;
+        throw error;
+    }
+
+    const salesCount = await getCollection("sales").countDocuments({ customer_id: customerId });
+
+    if (salesCount > 0) {
+        const error = new Error("Customer cannot be deleted because it has sales history");
+        error.statusCode = 409;
+        throw error;
+    }
+
+    const result = await getCustomerCollection().deleteOne({ _id: customerId });
 
     if (result.deletedCount === 0) {
         const error = new Error("Customer not found");
@@ -143,8 +180,9 @@ async function deleteCustomer(id) {
 }
 
 module.exports = {
-    listCustomers,
+    listCustomersWithOptions,
     getCustomerById,
+    getWalkInCustomer,
     createCustomer,
     updateCustomer,
     deleteCustomer,

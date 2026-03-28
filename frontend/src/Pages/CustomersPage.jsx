@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Edit3, Plus, Search, Trash2, Users } from "lucide-react";
+import { Edit3, Plus, Search, ShoppingCart, Trash2, Users } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import useAxios from "../Hooks/UseAxios";
 import CustomerFormModal from "../Componenets/CustomerFormModal";
@@ -21,8 +22,8 @@ function formatDateTime(value) {
 
 function CustomersPage() {
     const axios = useAxios();
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
-
     const [searchTerm, setSearchTerm] = useState("");
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
@@ -134,14 +135,14 @@ function CustomersPage() {
 
             <div className="flex-1 overflow-hidden rounded border border-gray-200">
                 <div className="h-full overflow-x-auto">
-                    <table className="min-w-[760px] w-full table-fixed border-collapse text-left lg:min-w-full">
+                    <table className="min-w-[880px] w-full table-fixed border-collapse text-left lg:min-w-full">
                         <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100">
                             <tr className="divide-x divide-gray-200">
-                                <th className="w-[240px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Name</th>
-                                <th className="w-[180px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Phone</th>
+                                <th className="w-[200px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Name</th>
+                                <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Phone</th>
                                 <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Created</th>
                                 <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Updated</th>
-                                <th className="w-[120px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Actions</th>
+                                <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -152,7 +153,6 @@ function CustomersPage() {
                                     </td>
                                 </tr>
                             )}
-
                             {customersQuery.isError && (
                                 <tr>
                                     <td className="px-3 py-8 text-center text-sm text-red-500" colSpan={5}>
@@ -160,7 +160,6 @@ function CustomersPage() {
                                     </td>
                                 </tr>
                             )}
-
                             {!customersQuery.isLoading && !customersQuery.isError && filteredCustomers.length === 0 && (
                                 <tr>
                                     <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={5}>
@@ -168,7 +167,6 @@ function CustomersPage() {
                                     </td>
                                 </tr>
                             )}
-
                             {filteredCustomers.map((customer) => (
                                 <tr key={customer._id} className="divide-x divide-gray-200 transition-colors hover:bg-gray-100">
                                     <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">{customer.name}</td>
@@ -178,10 +176,13 @@ function CustomersPage() {
                                     <td className="px-3 py-2">
                                         <div className="flex items-center justify-center gap-2">
                                             <button
-                                                className="p-1 text-blue-500"
-                                                onClick={() => setEditingCustomer(customer)}
+                                                className="p-1 text-emerald-600"
+                                                onClick={() => navigate(`/pos?customerId=${customer._id}&lockCustomer=true&channel=customer`)}
                                                 type="button"
                                             >
+                                                <ShoppingCart size={16} />
+                                            </button>
+                                            <button className="p-1 text-blue-500" onClick={() => setEditingCustomer(customer)} type="button">
                                                 <Edit3 size={16} />
                                             </button>
                                             <button

@@ -3,6 +3,7 @@ import MainLayout from "./Layouts/MainLayout";
 import Error404Page from "./Pages/Error404Page";
 import InventoryPage from "./Pages/InventoryPage";
 import CustomersPage from "./Pages/CustomersPage";
+import POSPage from "./Pages/POSPage";
 
 const router = createBrowserRouter([
     {
@@ -20,6 +21,10 @@ const router = createBrowserRouter([
             {
                 path: "customers",
                 element: <CustomersPage />,
+            },
+            {
+                path: "pos",
+                element: <POSPage />,
             },
             {
                 path: "company-due",

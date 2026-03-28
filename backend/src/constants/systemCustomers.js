@@ -1,0 +1,9 @@
+const WALK_IN_CUSTOMER_TAG = "walk-in";
+const WALK_IN_CUSTOMER_PHONE = "WALK-IN-CUSTOMER";
+const WALK_IN_CUSTOMER_NAME = "Walk-in Customer";
+
+module.exports = {
+    WALK_IN_CUSTOMER_TAG,
+    WALK_IN_CUSTOMER_PHONE,
+    WALK_IN_CUSTOMER_NAME,
+};

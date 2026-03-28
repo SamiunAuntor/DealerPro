@@ -1,167 +1,165 @@
-import React, { useState, useEffect } from 'react';
-import {
-    Plus,
-    Search,
-    Edit3,
-    Eye,
-    Trash2,
-    PackagePlus,
-    ChevronLeft,
-    ChevronRight
-} from 'lucide-react'; // Added the missing imports here
-import AddProductModal from '../Componenets/AddProductModal';
-import UpdateProductModal from '../Componenets/UpdateProductModal';
-import StockInModal from '../Componenets/StockInModal';
-import useAxios from '../Hooks/UseAxios';
-import Swal from 'sweetalert2';
+import React, { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, Edit3, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Swal from "sweetalert2";
+import AddProductModal from "../Componenets/AddProductModal";
+import StockInModal from "../Componenets/StockInModal";
+import UpdateProductModal from "../Componenets/UpdateProductModal";
+import useAxios from "../Hooks/UseAxios";
+import { formatCurrency, formatUnitLabel, getStockSummaryLabel } from "../utils/unitConversion";
 
-const InventoryPage = () => {
+function InventoryPage() {
+    const axios = useAxios();
+    const queryClient = useQueryClient();
+    const [searchTerm, setSearchTerm] = useState("");
     const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const axios = useAxios();
-    const [products, setProducts] = useState([]);
-    const [deletingId, setDeletingId] = useState(null); // stores which product is being deleted
     const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
 
+    const productsQuery = useQuery({
+        queryKey: ["products"],
+        queryFn: async () => {
+            const response = await axios.get("/products/get-all-products");
+            return response.data;
+        },
+    });
 
-    useEffect(() => {
-        const fetchProducts = async () => {
-            try {
-                const response = await axios.get('/products/get-all-products');
-                setProducts(response.data); // store the data in state
-            } catch (error) {
-                console.error("Failed to fetch products:", error);
-            }
-        };
+    const deleteProductMutation = useMutation({
+        mutationFn: (id) => axios.delete(`/products/delete-product/${id}`),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["products"] });
+            Swal.fire("Deleted!", "Product deleted successfully.", "success");
+        },
+        onError: (error) => {
+            Swal.fire("Error", error.response?.data?.message || "Failed to delete the product.", "error");
+        },
+    });
 
-        fetchProducts();
-    }, []);
+    const filteredProducts = useMemo(() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    const handleDelete = async (id, code) => {
+        if (!normalizedSearch) {
+            return productsQuery.data || [];
+        }
+
+        return (productsQuery.data || []).filter((product) => {
+            return (
+                product.name.toLowerCase().includes(normalizedSearch) ||
+                product.code.toLowerCase().includes(normalizedSearch) ||
+                product.product_id.toLowerCase().includes(normalizedSearch)
+            );
+        });
+    }, [productsQuery.data, searchTerm]);
+
+    const handleDelete = async (product) => {
         const result = await Swal.fire({
-            title: `Delete "${code}"?`,
+            title: `Delete "${product.code}"?`,
             text: "This action cannot be undone!",
             icon: "warning",
             showCancelButton: true,
             confirmButtonColor: "#ef4444",
             cancelButtonColor: "#6b7280",
             confirmButtonText: "Yes, delete it!",
-            cancelButtonText: "Cancel"
+            cancelButtonText: "Cancel",
         });
 
         if (result.isConfirmed) {
-            try {
-                setDeletingId(id); // disable button while deleting
-                await axios.delete(`/products/delete-product/${id}`);
-
-                // Refresh products
-                const response = await axios.get('/products/get-all-products');
-                setProducts(response.data);
-
-                Swal.fire('Deleted!', `"${code}" has been deleted.`, 'success');
-            } catch (err) {
-                console.error("Delete Error:", err);
-                Swal.fire('Error', 'Failed to delete the product.', 'error');
-            } finally {
-                setDeletingId(null);
-            }
+            deleteProductMutation.mutate(product._id);
         }
     };
 
     return (
-        <div className="flex flex-col h-full w-full bg-white px-2 py-2">
-            {/* Header section - name on left, search/add on right */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 px-1 gap-3">
-                <h1 className="text-lg font-bold text-gray-800 tracking-tight shrink-0">Product Inventory</h1>
+        <div className="flex h-full w-full flex-col bg-white px-2 py-2">
+            <div className="mb-3 flex flex-col items-start justify-between gap-3 px-1 sm:flex-row sm:items-center">
+                <h1 className="shrink-0 text-lg font-bold tracking-tight text-gray-800">Product Inventory</h1>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex w-full items-center gap-2 sm:w-auto">
                     <div className="relative flex-1 sm:flex-initial">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                         <input
-                            type="text"
+                            className="w-full rounded border border-gray-200 bg-gray-50 py-1.5 pl-8 pr-3 text-xs focus:border-blue-500 focus:outline-none sm:w-60"
+                            onChange={(event) => setSearchTerm(event.target.value)}
                             placeholder="Search..."
-                            className="pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded text-xs w-full sm:w-60 focus:outline-none focus:border-blue-500"
+                            type="text"
+                            value={searchTerm}
                         />
                     </div>
                     <button
+                        className="flex shrink-0 items-center gap-2 rounded bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition-all hover:bg-slate-900"
                         onClick={() => setIsAddProductModalOpen(true)}
-                        className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-2 shrink-0"
+                        type="button"
                     >
-                        <Plus size={14} /> <span className=" xs:inline">ADD PRODUCT</span>
+                        <Plus size={14} />
+                        <span>Add Product</span>
                     </button>
                 </div>
             </div>
 
-            {/* Grid-Style Table with Gray Borders and Responsive Scroll */}
-            <div className="flex-1 overflow-hidden border border-gray-200 rounded flex flex-col">
-                <div className="overflow-x-auto flex-1">
-                    <table className="w-full text-left border-collapse table-fixed min-w-[1100px] lg:min-w-full">
-                        <thead className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
+            <div className="flex flex-1 flex-col overflow-hidden rounded border border-gray-200">
+                <div className="flex-1 overflow-x-auto">
+                    <table className="min-w-[1120px] w-full table-fixed border-collapse text-left lg:min-w-full">
+                        <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100">
                             <tr className="divide-x divide-gray-200">
-                                <th className="w-[80px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Code</th>
-                                <th className="w-[80px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">ID</th>
-                                <th className="w-[200px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Product Name</th>
-                                <th className="w-[110px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Category</th>
-                                <th className="w-[70px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Unit</th>
-                                <th className="w-[70px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Pcs/Pkt</th>
-                                <th className="w-[70px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Pcs/Ctn</th>
-                                <th className="w-[110px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Purchase (৳)</th>
-                                <th className="w-[90px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Com. Comm.</th>
-                                <th className="w-[80px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Com. Disc.</th>
-                                <th className="w-[80px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center">Stock</th>
-                                <th className="w-[110px] px-2 py-2 text-[10px] font-bold uppercase text-gray-600 text-center pr-4">Actions</th>
+                                <th className="w-[72px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Code</th>
+                                <th className="w-[72px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">ID</th>
+                                <th className="w-[200px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Product Name</th>
+                                <th className="w-[100px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Category</th>
+                                <th className="w-[84px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Default Unit</th>
+                                <th className="w-[64px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Pcs/Pkt</th>
+                                <th className="w-[64px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Pcs/Ctn</th>
+                                <th className="w-[104px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Purchase</th>
+                                <th className="w-[104px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Selling</th>
+                                <th className="w-[76px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Com. Comm.</th>
+                                <th className="w-[74px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Com. Disc.</th>
+                                <th className="w-[150px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Stock</th>
+                                <th className="w-[92px] px-2 py-1.5 text-center text-[10px] font-bold uppercase text-gray-600">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {products.map((p) => (
-                                <tr key={p._id} className="hover:bg-gray-100 divide-x divide-gray-200 transition-colors">
-                                    <td className="px-2 py-1.5 text-xs font-medium text-gray-700 text-center">{p.code}</td>
-                                    <td className="px-2 py-1.5 text-xs text-gray-500 text-center">{p.product_id}</td>
-                                    <td className="px-2 py-1.5 text-xs font-semibold text-gray-800 truncate text-center">{p.name}</td>
-                                    <td className="px-2 py-1.5 text-xs uppercase font-bold text-gray-400 text-center">{p.category}</td>
-                                    <td className="px-2 py-1.5 text-center text-xs capitalize">{p.unit_type}</td>
-                                    <td className="px-2 py-1.5 text-center text-xs text-gray-500">{p.pieces_per_packet}</td>
-                                    <td className="px-2 py-1.5 text-center text-xs text-gray-500">{p.pieces_per_cartoon}</td>
-                                    <td className="px-2 py-1.5 text-xs font-bold text-blue-700 bg-blue-50/20 text-center">৳{p.purchase_price}</td>
-                                    <td className="px-2 py-1.5 text-center text-xs text-gray-600 font-medium">৳{p.company_commission}</td>
-                                    <td className="px-2 py-1.5 text-center text-xs text-gray-600">{p.company_discount}%</td>
-                                    <td className="px-2 py-1.5 text-center">
-                                        <span className={`text-xs font-bold ${p.stock_count < 20 ? 'text-red-600 font-black' : 'text-blue-600'}`}>
-                                            {p.stock_count}
+                            {filteredProducts.map((product) => (
+                                <tr key={product._id} className="divide-x divide-gray-200 transition-colors hover:bg-gray-100">
+                                    <td className="px-2 py-1 text-center text-xs font-medium text-gray-700">{product.code}</td>
+                                    <td className="px-2 py-1 text-center text-xs text-gray-500">{product.product_id}</td>
+                                    <td className="px-2 py-1 text-center text-xs font-semibold text-gray-800">{product.name}</td>
+                                    <td className="px-2 py-1 text-center text-xs font-bold uppercase text-gray-400">{product.category}</td>
+                                    <td className="px-2 py-1 text-center text-xs capitalize">{formatUnitLabel(product.unit_type)}</td>
+                                    <td className="px-2 py-1 text-center text-xs text-gray-500">{product.pieces_per_packet}</td>
+                                    <td className="px-2 py-1 text-center text-xs text-gray-500">{product.pieces_per_cartoon}</td>
+                                    <td className="px-2 py-1 text-center text-xs font-bold text-blue-700">{formatCurrency(product.purchase_price)}</td>
+                                    <td className="px-2 py-1 text-center text-xs font-bold text-emerald-700">{formatCurrency(product.selling_price)}</td>
+                                    <td className="px-2 py-1 text-center text-xs font-medium text-gray-600">{formatCurrency(product.company_commission)}</td>
+                                    <td className="px-2 py-1 text-center text-xs text-gray-600">{product.company_discount}%</td>
+                                    <td className="px-2 py-1 text-center">
+                                        <span className={`text-xs font-bold ${product.stock_count < 20 ? "text-red-600" : "text-blue-600"}`}>
+                                            {getStockSummaryLabel(product.stock_summary)}
                                         </span>
                                     </td>
-                                    <td className="px-2 py-1.5 text-center">
+                                    <td className="px-2 py-1 text-center">
                                         <div className="flex items-center justify-center gap-1">
-                                            <button title="Stock In"
-                                                className="p-1 text-green-500 "
+                                            <button
+                                                className="p-1 text-green-500"
                                                 onClick={() => {
-                                                    setSelectedProduct(p);
+                                                    setSelectedProduct(product);
                                                     setIsStockInModalOpen(true);
                                                 }}
+                                                type="button"
                                             >
                                                 <PackagePlus size={16} />
                                             </button>
                                             <button
-                                                title="Edit"
-                                                className="p-1 text-blue-500 "
+                                                className="p-1 text-blue-500"
                                                 onClick={() => {
-                                                    setSelectedProduct(p);
+                                                    setSelectedProduct(product);
                                                     setIsUpdateModalOpen(true);
                                                 }}
+                                                type="button"
                                             >
                                                 <Edit3 size={16} />
                                             </button>
-                                            <button
-                                                title="Delete"
-                                                className={`p-1 text-red-500  ${deletingId === p._id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                disabled={deletingId === p._id}
-                                                onClick={() => handleDelete(p._id, p.code)}
-                                            >
+                                            <button className="p-1 text-red-500" onClick={() => handleDelete(product)} type="button">
                                                 <Trash2 size={16} />
                                             </button>
-
-
                                         </div>
                                     </td>
                                 </tr>
@@ -171,40 +169,36 @@ const InventoryPage = () => {
                 </div>
             </div>
 
-            {/* Pagination UI */}
-            <div className="mt-2 px-1 flex items-center justify-between shrink-0">
-                <p className="text-[10px] text-gray-400 font-medium italic">Showing {products.length} entries</p>
+            <div className="mt-2 flex shrink-0 items-center justify-between px-1">
+                <p className="text-[10px] font-medium italic text-gray-400">Showing {filteredProducts.length} entries</p>
                 <div className="flex items-center gap-4">
-                    <button className="text-[10px] font-bold text-gray-400 hover:text-gray-600 flex items-center gap-1 uppercase">
+                    <button className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-400 hover:text-gray-600" type="button">
                         <ChevronLeft size={12} /> Prev
                     </button>
                     <div className="flex gap-1">
-                        <span className="w-5 h-5 flex items-center justify-center text-[10px] font-bold bg-slate-800 text-white rounded">1</span>
+                        <span className="flex h-5 w-5 items-center justify-center rounded bg-slate-800 text-[10px] font-bold text-white">1</span>
                     </div>
-                    <button className="text-[10px] font-bold text-gray-800 hover:text-blue-600 flex items-center gap-1 uppercase">
+                    <button className="flex items-center gap-1 text-[10px] font-bold uppercase text-gray-800 hover:text-blue-600" type="button">
                         Next <ChevronRight size={12} />
                     </button>
                 </div>
             </div>
 
-            <AddProductModal isOpen={isAddProductModalOpen} onClose={() => setIsAddProductModalOpen(false)} />
+            <AddProductModal
+                isOpen={isAddProductModalOpen}
+                onClose={() => setIsAddProductModalOpen(false)}
+                onSuccess={() => queryClient.invalidateQueries({ queryKey: ["products"] })}
+            />
+
             <UpdateProductModal
-                // The key ensures the modal's internal state resets when the product changes
-                key={selectedProduct?._id || 'none'}
+                key={selectedProduct?._id || "none"}
                 isOpen={isUpdateModalOpen}
                 onClose={() => {
                     setIsUpdateModalOpen(false);
                     setSelectedProduct(null);
                 }}
                 product={selectedProduct}
-                onUpdateSuccess={async () => {
-                    try {
-                        const response = await axios.get('/products/get-all-products');
-                        setProducts(response.data);
-                    } catch (error) {
-                        console.error('Failed to refresh products:', error);
-                    }
-                }}
+                onUpdateSuccess={() => queryClient.invalidateQueries({ queryKey: ["products"] })}
             />
 
             <StockInModal
@@ -213,16 +207,11 @@ const InventoryPage = () => {
                     setIsStockInModalOpen(false);
                     setSelectedProduct(null);
                 }}
+                onUpdateSuccess={() => queryClient.invalidateQueries({ queryKey: ["products"] })}
                 product={selectedProduct}
-                onUpdateSuccess={async () => {
-                    // Refresh products list
-                    const response = await axios.get('/products/get-all-products');
-                    setProducts(response.data);
-                }}
             />
-
         </div>
     );
-};
+}
 
 export default InventoryPage;

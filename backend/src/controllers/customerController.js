@@ -13,7 +13,9 @@ function sendErrorResponse(res, error, fallbackMessage) {
 
 async function getCustomers(req, res) {
     try {
-        const customers = await customerService.listCustomers();
+        const customers = await customerService.listCustomersWithOptions({
+            includeSystem: req.query.include_system === "true",
+        });
         return res.json(customers);
     } catch (error) {
         return sendErrorResponse(res, error, "Failed to fetch customers");
@@ -22,10 +24,21 @@ async function getCustomers(req, res) {
 
 async function getCustomer(req, res) {
     try {
-        const customer = await customerService.getCustomerById(req.params.id);
+        const customer = await customerService.getCustomerById(req.params.id, {
+            includeSystem: req.query.include_system === "true",
+        });
         return res.json(customer);
     } catch (error) {
         return sendErrorResponse(res, error, "Failed to fetch customer");
+    }
+}
+
+async function getWalkInCustomer(req, res) {
+    try {
+        const customer = await customerService.getWalkInCustomer();
+        return res.json(customer);
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to fetch walk-in customer");
     }
 }
 
@@ -65,6 +78,7 @@ async function deleteCustomer(req, res) {
 module.exports = {
     getCustomers,
     getCustomer,
+    getWalkInCustomer,
     addCustomer,
     updateCustomer,
     deleteCustomer,

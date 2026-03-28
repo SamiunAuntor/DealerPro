@@ -3,6 +3,7 @@ import { X, Check, ChevronDown } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useAxios from '../Hooks/UseAxios';
 import { useMutation } from '@tanstack/react-query';
+import { UNIT_OPTIONS } from '../utils/unitConversion';
 
 
 // 1. CONSTANTS DECLARED OUTSIDE
@@ -38,7 +39,7 @@ const FormRow = ({ label, required, children }) => (
     </div>
 );
 
-const AddProductModal = ({ isOpen, onClose }) => {
+const AddProductModal = ({ isOpen, onClose, onSuccess }) => {
     const [formData, setFormData] = useState(INITIAL_STATE);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -86,6 +87,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
             });
 
             setFormData(INITIAL_STATE);
+            onSuccess?.();
             onClose();
         },
 
@@ -181,9 +183,9 @@ const AddProductModal = ({ isOpen, onClose }) => {
 
                         <FormRow label="Unit Type" required>
                             <select name="unit_type" value={formData.unit_type} onChange={handleChange} className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none font-bold">
-                                <option value="pieces">Pieces</option>
-                                <option value="box">Box</option>
-                                <option value="pkt">Packet</option>
+                                {UNIT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
                             </select>
                         </FormRow>
 

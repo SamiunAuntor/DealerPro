@@ -1,41 +1,47 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import useAxios from '../Hooks/UseAxios';
-import Swal from 'sweetalert2';
+import React, { useState } from "react";
+import { X } from "lucide-react";
+import Swal from "sweetalert2";
+import useAxios from "../Hooks/UseAxios";
+import { UNIT_OPTIONS, formatCurrency, formatUnitLabel, getStockSummaryLabel } from "../utils/unitConversion";
 
-const StockInModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
-    const [quantity, setQuantity] = useState('');
+function StockInModal({ isOpen, onClose, product, onUpdateSuccess }) {
+    const [quantity, setQuantity] = useState("");
+    const [unitType, setUnitType] = useState("pieces");
     const [loading, setLoading] = useState(false);
     const axios = useAxios();
 
-    if (!isOpen || !product) return null;
+    if (!isOpen || !product) {
+        return null;
+    }
 
     const handleStockIn = async () => {
-        if (!quantity || quantity <= 0) {
-            Swal.fire('Error', 'Please enter a valid quantity', 'error');
+        if (!quantity || Number(quantity) <= 0) {
+            Swal.fire("Error", "Please enter a valid quantity", "error");
             return;
         }
 
         setLoading(true);
         try {
             await axios.post(`/products/stock-in/${product._id}`, {
-                quantity: parseInt(quantity),
+                quantity: Number(quantity),
+                unit_type: unitType,
             });
 
             Swal.fire({
-                icon: 'success',
-                title: 'Stock Updated',
-                text: `${quantity} pieces added to ${product.code}`,
+                icon: "success",
+                title: "Stock Updated",
+                text: `${quantity} ${unitType} added to ${product.code}`,
                 timer: 1500,
-                showConfirmButton: false
+                showConfirmButton: false,
             });
 
-            setQuantity('');
+            setQuantity("");
+            setUnitType("pieces");
             onUpdateSuccess();
             onClose();
         } catch (error) {
             console.error(error);
-            Swal.fire('Error', 'Failed to update stock', 'error');
+            Swal.fire("Error", error.response?.data?.message || "Failed to update stock", "error");
         } finally {
             setLoading(false);
         }
@@ -43,65 +49,77 @@ const StockInModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            {/* Modal Container: Removed heavy borders and dark backgrounds */}
-            <div className="bg-white w-11/12 max-w-md rounded-lg shadow-xl overflow-hidden">
-
-                {/* Header: Simplified with just Title and Close */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+            <div className="w-11/12 max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <h2 className="text-lg font-bold text-slate-800">Add Stock</h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
+                    <button className="text-gray-400 transition-colors hover:text-gray-600" onClick={onClose} type="button">
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Content: Left Aligned and Structured */}
-                <div className="p-6 space-y-4">
+                <div className="space-y-4 p-6">
                     <div className="text-left">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Product Name</label>
-                        <p className="text-base font-semibold text-slate-800 uppercase">{product.name}</p>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Product Name</label>
+                        <p className="text-base font-semibold uppercase text-slate-800">{product.name}</p>
                     </div>
 
-                    <div className="flex gap-10">
+                    <div className="grid gap-4 sm:grid-cols-2">
                         <div className="text-left">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Product Code</label>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Product Code</label>
                             <p className="text-sm font-medium text-slate-600">{product.code}</p>
                         </div>
                         <div className="text-left">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">In Stock</label>
-                            <p className="text-sm font-bold text-blue-600">{product.stock_count} Pieces</p>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Current Stock</label>
+                            <p className="text-sm font-bold text-blue-600">{getStockSummaryLabel(product.stock_summary)}</p>
                         </div>
                     </div>
 
-                    <hr className="border-gray-100" />
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                            Purchase Price Per {formatUnitLabel(product.unit_type)}
+                        </p>
+                        <p className="mt-1 text-sm font-semibold text-gray-800">{formatCurrency(product.purchase_price)}</p>
+                    </div>
 
-                    <div className="text-left pt-2">
-                        <label className="block text-xs font-bold text-slate-700 mb-2">New Add Stock Quantity</label>
-                        <input
-                            type="number"
-                            value={quantity}
-                            onChange={(e) => setQuantity(e.target.value)}
-                            placeholder="Enter amount"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-800/10 focus: text-sm transition-all"
-                        />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="text-left">
+                            <label className="mb-2 block text-xs font-bold text-slate-700">Quantity</label>
+                            <input
+                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-800/10"
+                                onChange={(event) => setQuantity(event.target.value)}
+                                placeholder="Enter amount"
+                                type="number"
+                                value={quantity}
+                            />
+                        </div>
+                        <div className="text-left">
+                            <label className="mb-2 block text-xs font-bold text-slate-700">Unit</label>
+                            <select
+                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-800/10"
+                                onChange={(event) => setUnitType(event.target.value)}
+                                value={unitType}
+                            >
+                                {UNIT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                {/* Footer: Single Action Button */}
-                <div className="px-6 py-4 bg-gray-50 flex justify-end">
+                <div className="flex justify-end bg-gray-50 px-6 py-4">
                     <button
+                        className="w-full rounded bg-slate-800 py-2.5 text-xs font-bold text-white transition-all hover:bg-slate-900 disabled:opacity-50"
                         disabled={loading}
                         onClick={handleStockIn}
-                        className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 rounded text-xs transition-all disabled:opacity-50"
+                        type="button"
                     >
-                        {loading ? 'PROCESSING...' : 'ADD STOCK'}
+                        {loading ? "PROCESSING..." : "ADD STOCK"}
                     </button>
                 </div>
             </div>
         </div>
     );
-};
+}
 
 export default StockInModal;

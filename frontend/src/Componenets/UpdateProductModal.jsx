@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { X, Check, ChevronDown } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useAxios from '../Hooks/UseAxios';
+import { UNIT_OPTIONS } from '../utils/unitConversion';
 
 const CATEGORIES = [
     "BP", "GP", "SS", "OS", "File", "NB", "PF", "Chocolaate", "Chewing Gum",
@@ -79,7 +80,19 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
 
         try {
             // Strip out non-updatable fields
-            const { _id, stock, stock_count, createdAt, ...updatePayload } = formData;
+            const updatePayload = {
+                code: formData.code,
+                product_id: formData.product_id,
+                category: formData.category,
+                name: formData.name,
+                company_commission: formData.company_commission,
+                company_discount: formData.company_discount,
+                unit_type: formData.unit_type,
+                pieces_per_packet: formData.pieces_per_packet,
+                pieces_per_cartoon: formData.pieces_per_cartoon,
+                purchase_price: formData.purchase_price,
+                selling_price: formData.selling_price,
+            };
 
             // Ensure numeric consistency
             const numericFields = [
@@ -93,7 +106,7 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
                 }
             });
 
-            const response = await axios.patch(`/products/update-product/${_id}`, updatePayload);
+            const response = await axios.patch(`/products/update-product/${formData._id}`, updatePayload);
 
             if (response.status === 200) {
                 Swal.fire({
@@ -173,9 +186,9 @@ const UpdateProductModal = ({ isOpen, onClose, product, onUpdateSuccess }) => {
 
                         <FormRow label="Unit Type" required>
                             <select name="unit_type" value={formData.unit_type} onChange={handleChange} className="w-full p-2 bg-gray-50 border border-gray-200 rounded text-sm outline-none font-bold">
-                                <option value="pieces">Pieces</option>
-                                <option value="box">Box</option>
-                                <option value="pkt">Packet</option>
+                                {UNIT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
                             </select>
                         </FormRow>
 
