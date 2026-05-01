@@ -40,6 +40,8 @@ function DashboardPage() {
 
     const currentSnapshot = dashboardQuery.data?.current_snapshot || {
         inventory_valuation: 0,
+        opening_dealer_valuation: 0,
+        left_to_company_amount: 0,
         total_products: 0,
         customer_count: 0,
         low_stock_count: 0,
@@ -73,13 +75,21 @@ function DashboardPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                         <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                             Inventory Valuation
                         </p>
                         <p className="mt-2 text-2xl font-black text-gray-900">
                             {formatCurrency(currentSnapshot.inventory_valuation)}
+                        </p>
+                    </div>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                            Left To Company
+                        </p>
+                        <p className="mt-2 text-xl font-semibold text-gray-900">
+                            {formatCurrency(currentSnapshot.left_to_company_amount)}
                         </p>
                     </div>
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">

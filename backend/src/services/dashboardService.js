@@ -1,5 +1,9 @@
 const { getCollection } = require("../db/mongo");
 const { roundMoney } = require("../utils/money");
+const {
+    DEALER_VALUATION_COLLECTION,
+    DEALER_VALUATION_SINGLETON_KEY,
+} = require("../constants/dealerValuation");
 
 function buildValidationError(message) {
     const error = new Error(message);
@@ -77,6 +81,7 @@ async function getDashboardOverview(range = "30d") {
     const returnsCollection = getCollection("returns");
     const productsCollection = getCollection("products");
     const customersCollection = getCollection("customers");
+    const dealerValuationCollection = getCollection(DEALER_VALUATION_COLLECTION);
     const dateMatch = buildDateMatch(rangeConfig);
 
     const [
@@ -92,6 +97,7 @@ async function getDashboardOverview(range = "30d") {
         topCustomersRows,
         recentSales,
         recentReturns,
+        dealerValuationRecord,
     ] = await Promise.all([
         salesCollection
             .aggregate([
@@ -252,6 +258,9 @@ async function getDashboardOverview(range = "30d") {
             .sort({ created_at: -1 })
             .limit(6)
             .toArray(),
+        dealerValuationCollection.findOne({
+            singleton_key: DEALER_VALUATION_SINGLETON_KEY,
+        }),
     ]);
 
     const salesSummary = salesSummaryResult[0] || {
@@ -271,6 +280,13 @@ async function getDashboardOverview(range = "30d") {
         inventory_valuation: 0,
     };
     const lowStockCount = lowStockCountResult[0]?.count || 0;
+    const inventoryValuation = roundMoney(productSnapshot.inventory_valuation || 0);
+    const openingDealerValuation = roundMoney(
+        dealerValuationRecord?.opening_valuation_amount || 0
+    );
+    const leftToCompanyAmount = roundMoney(
+        Math.max(openingDealerValuation - inventoryValuation, 0)
+    );
 
     const salesTrendMap = new Map(
         salesTrendRows.map((row) => [row._id, roundMoney(row.sales_amount || 0)])
@@ -292,7 +308,9 @@ async function getDashboardOverview(range = "30d") {
             label: rangeConfig.label,
         },
         current_snapshot: {
-            inventory_valuation: roundMoney(productSnapshot.inventory_valuation || 0),
+            inventory_valuation: inventoryValuation,
+            opening_dealer_valuation: openingDealerValuation,
+            left_to_company_amount: leftToCompanyAmount,
             total_products: productSnapshot.total_products || 0,
             customer_count: customerCount,
             low_stock_count: lowStockCount,
