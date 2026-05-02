@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import { Banknote, Eye, RotateCcw } from "lucide-react";
+import { Banknote, Download, Eye, RotateCcw } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import useAxios from "../Hooks/UseAxios";
 import SaleInvoiceDetailsModal from "../Componenets/SaleInvoiceDetailsModal";
 import ReturnSaleModal from "../Componenets/ReturnSaleModal";
+import { downloadSaleInvoicePdf } from "../utils/invoicePdf";
 import { formatCurrency } from "../utils/unitConversion";
 
 function formatDateTime(value) {
@@ -143,6 +144,19 @@ function SalesHistoryPage() {
             );
         },
     });
+
+    const handleDownloadInvoice = async (saleId) => {
+        try {
+            const response = await axios.get(`/sales/${saleId}`);
+            downloadSaleInvoicePdf(response.data);
+        } catch (error) {
+            Swal.fire(
+                "Error",
+                error.response?.data?.message || "Failed to download invoice.",
+                "error"
+            );
+        }
+    };
 
     const handleReceivePayment = async (sale) => {
         const { value: formValues } = await Swal.fire({
@@ -314,7 +328,6 @@ function SalesHistoryPage() {
             [
                 { header: "Invoice", key: "invoice_number", width: 30 },
                 { header: "Customer", key: "customer_name", width: 26 },
-                { header: "Channel", key: "channel", width: 16 },
                 { header: "Amount", key: "total_amount", width: 18 },
                 { header: "Paid", key: "paid_amount", width: 18 },
                 { header: "Due", key: "due_amount", width: 18 },
@@ -425,7 +438,7 @@ function SalesHistoryPage() {
                 </div>
 
                 <div className="mt-1 overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-[1180px] w-full table-fixed border-collapse text-left">
+                    <table className="min-w-[1060px] w-full table-fixed border-collapse text-left">
                         <thead className="border-b border-gray-200 bg-gray-100">
                             <tr className="divide-x divide-gray-200">
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
@@ -433,9 +446,6 @@ function SalesHistoryPage() {
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
                                     Customer
-                                </th>
-                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
-                                    Channel
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
                                     Amount
@@ -486,9 +496,6 @@ function SalesHistoryPage() {
                                     <td className="px-3 py-2 text-center text-sm text-gray-700">
                                         {getDisplayCustomerName(sale.customer_snapshot?.name)}
                                     </td>
-                                    <td className="px-3 py-2 text-center text-sm capitalize text-gray-700">
-                                        {sale.channel}
-                                    </td>
                                     <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">
                                         {formatCurrency(sale.total_amount)}
                                     </td>
@@ -535,6 +542,13 @@ function SalesHistoryPage() {
                                                 type="button"
                                             >
                                                 <Banknote size={16} />
+                                            </button>
+                                            <button
+                                                className="p-1 text-slate-700"
+                                                onClick={() => handleDownloadInvoice(sale._id)}
+                                                type="button"
+                                            >
+                                                <Download size={16} />
                                             </button>
                                             <button
                                                 className="p-1 text-blue-500"

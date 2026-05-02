@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import useAxios from "../Hooks/UseAxios";
+import { printSaleInvoicePdf } from "../utils/invoicePdf";
 import {
     UNIT_OPTIONS,
     calculateSalePreview,
@@ -297,11 +298,20 @@ function POSPage() {
                 setSelectedCustomerId("");
             }
 
-            Swal.fire(
-                "Success",
-                `Invoice ${response.data.sale.invoice_number} created with ${response.data.sale.payment_status.replaceAll("_", " ")} status.`,
-                "success"
-            );
+            const result = await Swal.fire({
+                title: "Sale Completed",
+                text: `Invoice ${response.data.sale.invoice_number} created with ${response.data.sale.payment_status.replaceAll("_", " ")} status.`,
+                icon: "success",
+                showCancelButton: true,
+                confirmButtonColor: "#111827",
+                cancelButtonColor: "#d1d5db",
+                confirmButtonText: "Print Invoice",
+                cancelButtonText: "Close",
+            });
+
+            if (result.isConfirmed) {
+                printSaleInvoicePdf(response.data.sale);
+            }
 
             if (isCustomerLocked) {
                 navigate("/pos", { replace: true });
