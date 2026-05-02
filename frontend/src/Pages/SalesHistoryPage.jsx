@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import { Eye, RotateCcw } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Banknote, Eye, RotateCcw } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Swal from "sweetalert2";
 import useAxios from "../Hooks/UseAxios";
 import SaleInvoiceDetailsModal from "../Componenets/SaleInvoiceDetailsModal";
@@ -22,13 +22,63 @@ function formatDateTime(value) {
     });
 }
 
+function getReturnStatusLabel(status) {
+    if (status === "fully_returned") {
+        return "Full";
+    }
+
+    if (status === "partially_returned") {
+        return "Partial";
+    }
+
+    return "Not Returned";
+}
+
+function getReturnStatusClassName(status) {
+    if (status === "fully_returned") {
+        return "bg-red-50 text-red-600";
+    }
+
+    if (status === "partially_returned") {
+        return "bg-amber-50 text-amber-600";
+    }
+
+    return "bg-gray-100 text-gray-600";
+}
+
+function getPaymentStatusLabel(status) {
+    if (status === "partially_paid") {
+        return "Partial";
+    }
+
+    if (status === "unpaid") {
+        return "Unpaid";
+    }
+
+    return "Paid";
+}
+
+function getPaymentStatusClassName(status) {
+    if (status === "partially_paid") {
+        return "bg-amber-50 text-amber-600";
+    }
+
+    if (status === "unpaid") {
+        return "bg-red-50 text-red-600";
+    }
+
+    return "bg-emerald-50 text-emerald-600";
+}
+
 function SalesHistoryPage() {
     const axios = useAxios();
+    const queryClient = useQueryClient();
     const [selectedSale, setSelectedSale] = useState(null);
     const [saleToReturn, setSaleToReturn] = useState(null);
     const [historyFilters, setHistoryFilters] = useState({
         customer_id: "",
         channel: "",
+        payment_status: "",
         from: "",
         to: "",
     });
@@ -63,33 +113,77 @@ function SalesHistoryPage() {
         return walkInCustomer ? [walkInCustomer, ...regularCustomers] : regularCustomers;
     }, [customersQuery.data]);
 
-    const getReturnStatusLabel = (status) => {
-        if (status === "fully_returned") {
-            return "Full";
-        }
-
-        if (status === "partially_returned") {
-            return "Partial";
-        }
-
-        return "Not Returned";
-    };
-
-    const getReturnStatusClassName = (status) => {
-        if (status === "fully_returned") {
-            return "bg-red-50 text-red-600";
-        }
-
-        if (status === "partially_returned") {
-            return "bg-amber-50 text-amber-600";
-        }
-
-        return "bg-gray-100 text-gray-600";
-    };
-
     const getDisplayCustomerName = (name) =>
         name === "Walk-in Customer" ? "Anonymous Customer" : name;
     const salesRows = salesQuery.data || [];
+
+    const refreshSalesData = async () => {
+        await queryClient.invalidateQueries({ queryKey: ["sales"] });
+    };
+
+    const paymentMutation = useMutation({
+        mutationFn: async ({ saleId, payload }) => {
+            const response = await axios.post(`/sales/${saleId}/payments`, payload);
+            return response.data.sale;
+        },
+        onSuccess: async (updatedSale) => {
+            await refreshSalesData();
+
+            if (selectedSale?._id === updatedSale._id) {
+                setSelectedSale(updatedSale);
+            }
+
+            Swal.fire("Success", "Payment recorded successfully.", "success");
+        },
+        onError: (error) => {
+            Swal.fire(
+                "Error",
+                error.response?.data?.message || "Failed to record payment.",
+                "error"
+            );
+        },
+    });
+
+    const handleReceivePayment = async (sale) => {
+        const { value: formValues } = await Swal.fire({
+            title: `Receive Payment for ${sale.invoice_number}`,
+            html:
+                `<input id="payment-amount" class="swal2-input" type="number" min="0" placeholder="Amount" value="${sale.due_amount || 0}">` +
+                '<select id="payment-method" class="swal2-input"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobile-banking">Mobile Banking</option></select>' +
+                '<input id="payment-note" class="swal2-input" placeholder="Optional note">',
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: "Record Payment",
+            preConfirm: () => {
+                const amount = Number(document.getElementById("payment-amount")?.value || 0);
+
+                if (!Number.isFinite(amount) || amount <= 0) {
+                    Swal.showValidationMessage("Payment amount must be greater than zero.");
+                    return false;
+                }
+
+                if (amount > Number(sale.due_amount || 0)) {
+                    Swal.showValidationMessage("Payment amount cannot exceed the remaining due.");
+                    return false;
+                }
+
+                return {
+                    amount,
+                    method: document.getElementById("payment-method")?.value || "cash",
+                    note: document.getElementById("payment-note")?.value || "",
+                };
+            },
+        });
+
+        if (!formValues) {
+            return;
+        }
+
+        paymentMutation.mutate({
+            saleId: sale._id,
+            payload: formValues,
+        });
+    };
 
     const handleDownloadSalesReport = () => {
         if (salesRows.length === 0) {
@@ -196,6 +290,12 @@ function SalesHistoryPage() {
         addSummaryLine("From", historyFilters.from || "All Time");
         addSummaryLine("To", historyFilters.to || "Now");
         addSummaryLine("Channel", historyFilters.channel || "All channels");
+        addSummaryLine(
+            "Payment",
+            historyFilters.payment_status
+                ? getPaymentStatusLabel(historyFilters.payment_status)
+                : "All payment states"
+        );
 
         const selectedCustomerOption = customerOptions.find(
             (customer) => customer._id === historyFilters.customer_id
@@ -212,19 +312,25 @@ function SalesHistoryPage() {
         drawTable(
             "Sales History",
             [
-                { header: "Invoice", key: "invoice_number", width: 34 },
-                { header: "Customer", key: "customer_name", width: 28 },
-                { header: "Channel", key: "channel", width: 18 },
-                { header: "Amount", key: "total_amount", width: 22 },
-                { header: "Profit/Loss", key: "profit_loss", width: 24 },
-                { header: "Return", key: "return_status", width: 22 },
-                { header: "Created", key: "created_at", width: 32 },
+                { header: "Invoice", key: "invoice_number", width: 30 },
+                { header: "Customer", key: "customer_name", width: 26 },
+                { header: "Channel", key: "channel", width: 16 },
+                { header: "Amount", key: "total_amount", width: 18 },
+                { header: "Paid", key: "paid_amount", width: 18 },
+                { header: "Due", key: "due_amount", width: 18 },
+                { header: "Payment", key: "payment_status", width: 18 },
+                { header: "Profit/Loss", key: "profit_loss", width: 20 },
+                { header: "Return", key: "return_status", width: 18 },
+                { header: "Created", key: "created_at", width: 28 },
             ],
             salesRows.map((sale) => ({
                 invoice_number: sale.invoice_number,
                 customer_name: getDisplayCustomerName(sale.customer_snapshot?.name),
                 channel: sale.channel,
                 total_amount: formatCurrency(sale.total_amount),
+                paid_amount: formatCurrency(sale.paid_amount || 0),
+                due_amount: formatCurrency(sale.due_amount || 0),
+                payment_status: getPaymentStatusLabel(sale.payment_status),
                 profit_loss: formatCurrency(sale.profit_loss),
                 return_status: getReturnStatusLabel(sale.return_status),
                 created_at: formatDateTime(sale.created_at),
@@ -248,7 +354,7 @@ function SalesHistoryPage() {
                     </div>
 
                     <div className="flex w-full flex-col gap-2 xl:w-auto">
-                        <div className="grid w-full gap-2 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="grid w-full gap-2 md:grid-cols-2 xl:grid-cols-5">
                             <input
                                 className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
                                 onChange={(event) =>
@@ -279,6 +385,21 @@ function SalesHistoryPage() {
                             <select
                                 className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
                                 onChange={(event) =>
+                                    setHistoryFilters((prev) => ({
+                                        ...prev,
+                                        payment_status: event.target.value,
+                                    }))
+                                }
+                                value={historyFilters.payment_status}
+                            >
+                                <option value="">All payment states</option>
+                                <option value="paid">Paid</option>
+                                <option value="partially_paid">Partially Paid</option>
+                                <option value="unpaid">Unpaid</option>
+                            </select>
+                            <select
+                                className="rounded border border-gray-200 bg-gray-50 p-2 text-xs font-semibold outline-none focus:border-[#3cc720]"
+                                onChange={(event) =>
                                     setHistoryFilters((prev) => ({ ...prev, customer_id: event.target.value }))
                                 }
                                 value={historyFilters.customer_id}
@@ -304,7 +425,7 @@ function SalesHistoryPage() {
                 </div>
 
                 <div className="mt-1 overflow-x-auto rounded-lg border border-gray-200">
-                    <table className="min-w-[920px] w-full table-fixed border-collapse text-left">
+                    <table className="min-w-[1180px] w-full table-fixed border-collapse text-left">
                         <thead className="border-b border-gray-200 bg-gray-100">
                             <tr className="divide-x divide-gray-200">
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
@@ -318,6 +439,15 @@ function SalesHistoryPage() {
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
                                     Amount
+                                </th>
+                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                    Paid
+                                </th>
+                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                    Due
+                                </th>
+                                <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
+                                    Payment
                                 </th>
                                 <th className="px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">
                                     Profit / Loss
@@ -336,19 +466,19 @@ function SalesHistoryPage() {
                         <tbody className="divide-y divide-gray-200">
                             {salesQuery.isLoading && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={8}>
+                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={11}>
                                         Loading sales...
                                     </td>
                                 </tr>
                             )}
-                            {!salesQuery.isLoading && (salesQuery.data || []).length === 0 && (
+                            {!salesQuery.isLoading && salesRows.length === 0 && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={8}>
+                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={11}>
                                         No sales found for the selected filters.
                                     </td>
                                 </tr>
                             )}
-                            {(salesQuery.data || []).map((sale) => (
+                            {salesRows.map((sale) => (
                                 <tr key={sale._id} className="divide-x divide-gray-200">
                                     <td className="px-3 py-2 text-center text-xs font-semibold text-gray-800">
                                         {sale.invoice_number}
@@ -361,6 +491,21 @@ function SalesHistoryPage() {
                                     </td>
                                     <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">
                                         {formatCurrency(sale.total_amount)}
+                                    </td>
+                                    <td className="px-3 py-2 text-center text-sm font-semibold text-emerald-700">
+                                        {formatCurrency(sale.paid_amount || 0)}
+                                    </td>
+                                    <td className="px-3 py-2 text-center text-sm font-semibold text-amber-600">
+                                        {formatCurrency(sale.due_amount || 0)}
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                        <span
+                                            className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wider ${getPaymentStatusClassName(
+                                                sale.payment_status
+                                            )}`}
+                                        >
+                                            {getPaymentStatusLabel(sale.payment_status)}
+                                        </span>
                                     </td>
                                     <td
                                         className={`px-3 py-2 text-center text-sm font-semibold ${
@@ -383,6 +528,14 @@ function SalesHistoryPage() {
                                     </td>
                                     <td className="px-3 py-2 text-center">
                                         <div className="flex items-center justify-center gap-2">
+                                            <button
+                                                className="p-1 text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                                disabled={(sale.due_amount || 0) <= 0 || paymentMutation.isPending}
+                                                onClick={() => handleReceivePayment(sale)}
+                                                type="button"
+                                            >
+                                                <Banknote size={16} />
+                                            </button>
                                             <button
                                                 className="p-1 text-blue-500"
                                                 onClick={() => setSelectedSale(sale)}
@@ -410,6 +563,8 @@ function SalesHistoryPage() {
             <SaleInvoiceDetailsModal
                 isOpen={Boolean(selectedSale)}
                 onClose={() => setSelectedSale(null)}
+                onPaymentRecorded={refreshSalesData}
+                onReceivePayment={handleReceivePayment}
                 sale={selectedSale}
             />
             {saleToReturn && (

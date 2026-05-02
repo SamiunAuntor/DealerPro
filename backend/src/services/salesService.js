@@ -5,8 +5,23 @@ const { convertToPieces, validateUnitType } = require("../utils/unitConversion")
 const { roundMoney } = require("../utils/money");
 const { generateInvoiceNumber } = require("../utils/invoiceNumberService");
 
+const PAYMENT_STATUS = {
+    PAID: "paid",
+    PARTIALLY_PAID: "partially_paid",
+    UNPAID: "unpaid",
+};
+
+const PAYMENT_TYPE = {
+    INITIAL: "initial",
+    SETTLEMENT: "settlement",
+};
+
 function getSalesCollection() {
     return getCollection("sales");
+}
+
+function getSalePaymentsCollection() {
+    return getCollection("sale_payments");
 }
 
 function buildValidationError(message) {
@@ -15,18 +30,9 @@ function buildValidationError(message) {
     return error;
 }
 
-function assertNoDuplicateProducts(items) {
-    const seenProductIds = new Set();
-
-    for (const item of items) {
-        const productId = String(item.product_id || "");
-
-        if (seenProductIds.has(productId)) {
-            throw buildValidationError("The same product cannot be added twice in one sale");
-        }
-
-        seenProductIds.add(productId);
-    }
+function normalizePaymentMethod(value, fallback = "cash") {
+    const method = String(value || "").trim().toLowerCase();
+    return method || fallback;
 }
 
 function buildDateRangeFilter({ from, to }) {
@@ -47,6 +53,80 @@ function buildDateRangeFilter({ from, to }) {
     }
 
     return { created_at: createdAt };
+}
+
+function buildSalePaymentSummary({
+    totalAmount,
+    returnedAmount = 0,
+    paidAmount = 0,
+    lastPaymentAt = null,
+}) {
+    const normalizedTotalAmount = Math.max(roundMoney(totalAmount || 0), 0);
+    const normalizedReturnedAmount = Math.max(roundMoney(returnedAmount || 0), 0);
+    const collectibleAmount = Math.max(
+        roundMoney(normalizedTotalAmount - normalizedReturnedAmount),
+        0
+    );
+    const normalizedPaidAmount = Math.max(roundMoney(paidAmount || 0), 0);
+    const dueAmount = Math.max(roundMoney(collectibleAmount - normalizedPaidAmount), 0);
+    const refundDueAmount = Math.max(roundMoney(normalizedPaidAmount - collectibleAmount), 0);
+    const appliedPaidAmount = roundMoney(Math.min(normalizedPaidAmount, collectibleAmount));
+
+    let paymentStatus = PAYMENT_STATUS.PAID;
+
+    if (dueAmount <= 0) {
+        paymentStatus = PAYMENT_STATUS.PAID;
+    } else if (appliedPaidAmount <= 0) {
+        paymentStatus = PAYMENT_STATUS.UNPAID;
+    } else {
+        paymentStatus = PAYMENT_STATUS.PARTIALLY_PAID;
+    }
+
+    return {
+        payment_status: paymentStatus,
+        collectible_amount: collectibleAmount,
+        paid_amount: normalizedPaidAmount,
+        applied_paid_amount: appliedPaidAmount,
+        due_amount: dueAmount,
+        refund_due_amount: refundDueAmount,
+        last_payment_at: lastPaymentAt || null,
+    };
+}
+
+function normalizeSalePaymentFields(sale) {
+    if (!sale) {
+        return sale;
+    }
+
+    const summary = buildSalePaymentSummary({
+        totalAmount: sale.total_amount,
+        returnedAmount: sale.return_summary?.returned_amount || 0,
+        paidAmount:
+            sale.paid_amount ??
+            sale.payment_summary?.paid_amount ??
+            sale.total_amount ??
+            0,
+        lastPaymentAt: sale.last_payment_at || sale.payment_summary?.last_payment_at || null,
+    });
+
+    return {
+        ...sale,
+        ...summary,
+    };
+}
+
+function assertNoDuplicateProducts(items) {
+    const seenProductIds = new Set();
+
+    for (const item of items) {
+        const productId = String(item.product_id || "");
+
+        if (seenProductIds.has(productId)) {
+            throw buildValidationError("The same product cannot be added twice in one sale");
+        }
+
+        seenProductIds.add(productId);
+    }
 }
 
 function buildLineItems(productsById, requestedItems) {
@@ -168,7 +248,121 @@ function isTransactionUnsupportedError(error) {
     return message.includes("Transaction numbers are only allowed") || message.includes("replica set member");
 }
 
-async function createSale(payload) {
+function buildInitialPaymentConfig(payload, totalAmount, customer) {
+    const normalizedTotalAmount = roundMoney(totalAmount || 0);
+    const hasPaymentMode = payload.payment_mode !== undefined && payload.payment_mode !== null;
+
+    if (!hasPaymentMode) {
+        throw buildValidationError("Payment mode is required");
+    }
+
+    if (payload.paid_now_amount === undefined || payload.paid_now_amount === null || payload.paid_now_amount === "") {
+        throw buildValidationError("Paid amount is required");
+    }
+
+    const rawPaidAmount = roundMoney(payload.paid_now_amount);
+    if (!Number.isFinite(rawPaidAmount) || rawPaidAmount < 0) {
+        throw buildValidationError("Paid amount must be zero or greater");
+    }
+
+    const requestedMode = String(payload.payment_mode || "").trim().toLowerCase();
+
+    if (!["full", "partial", "unpaid"].includes(requestedMode)) {
+        throw buildValidationError("Payment mode must be full, partial, or unpaid");
+    }
+
+    const paymentMode = requestedMode;
+
+    let paidNowAmount = normalizedTotalAmount;
+
+    if (normalizedTotalAmount <= 0) {
+        if (paymentMode !== "full") {
+            throw buildValidationError("Zero-amount invoices must use full payment mode");
+        }
+
+        if (rawPaidAmount !== 0) {
+            throw buildValidationError("Zero-amount invoices must have zero paid amount");
+        }
+
+        paidNowAmount = 0;
+    } else if (paymentMode === "unpaid") {
+        if (rawPaidAmount !== 0) {
+            throw buildValidationError("Unpaid invoices must have zero paid amount");
+        }
+
+        paidNowAmount = 0;
+    } else if (paymentMode === "partial") {
+        if (rawPaidAmount <= 0 || rawPaidAmount >= normalizedTotalAmount) {
+            throw buildValidationError("Partial payment must be greater than zero and less than total amount");
+        }
+
+        paidNowAmount = rawPaidAmount;
+    }
+
+    if (paymentMode === "full") {
+        if (rawPaidAmount !== normalizedTotalAmount) {
+            throw buildValidationError("Fully paid invoices must match the total amount exactly");
+        }
+
+        paidNowAmount = normalizedTotalAmount;
+    }
+
+    if (paidNowAmount < normalizedTotalAmount && customer.is_system) {
+        throw buildValidationError("Anonymous walk-in customer sales must be fully paid");
+    }
+
+    return {
+        paymentMode,
+        paidNowAmount,
+        paymentMethod: normalizePaymentMethod(payload.payment_method),
+        paymentNote: String(payload.payment_note || "").trim(),
+    };
+}
+
+function buildPaymentRecord({
+    sale,
+    amount,
+    paymentType,
+    method,
+    note = "",
+    actor = null,
+    createdAt,
+}) {
+    return {
+        sale_id: sale._id,
+        invoice_number: sale.invoice_number,
+        customer_id: sale.customer_id,
+        customer_snapshot: sale.customer_snapshot,
+        amount: roundMoney(amount),
+        payment_type: paymentType,
+        method: normalizePaymentMethod(method),
+        note: String(note || "").trim(),
+        created_by: actor?.email || null,
+        created_at: createdAt,
+        updated_at: createdAt,
+    };
+}
+
+async function getSaleByIdRaw(id) {
+    const sale = await getSalesCollection().findOne({ _id: productService.toObjectId(id) });
+
+    if (!sale) {
+        const error = new Error("Sale not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    return sale;
+}
+
+async function listSalePaymentsInternal(saleId) {
+    return getSalePaymentsCollection()
+        .find({ sale_id: productService.toObjectId(saleId) })
+        .sort({ created_at: -1, _id: -1 })
+        .toArray();
+}
+
+async function createSale(payload, actor = null) {
     const requestedItems = Array.isArray(payload.items) ? payload.items : [];
     const dealerDiscountAmount = roundMoney(payload.dealer_discount_amount);
 
@@ -192,9 +386,15 @@ async function createSale(payload) {
         finalizedSale.dealerDiscountAmount,
         finalizedSale.subtotalAfterCompanyDiscount
     );
+    const paymentConfig = buildInitialPaymentConfig(payload, totals.total_amount, customer);
     const now = new Date();
     const invoiceNumber = await generateInvoiceNumber(customer, now);
 
+    const paymentSummary = buildSalePaymentSummary({
+        totalAmount: totals.total_amount,
+        paidAmount: paymentConfig.paidNowAmount,
+        lastPaymentAt: paymentConfig.paidNowAmount > 0 ? now : null,
+    });
     const saleDocument = {
         invoice_number: invoiceNumber,
         customer_id: customer._id,
@@ -206,6 +406,7 @@ async function createSale(payload) {
         channel: payload.channel === "customer" ? "customer" : "pos",
         items: finalizedLineItems,
         ...totals,
+        ...paymentSummary,
         created_at: now,
         updated_at: now,
         return_status: "not_returned",
@@ -226,6 +427,22 @@ async function createSale(payload) {
         session.startTransaction();
         await deductStocks(finalizedLineItems, session);
         const result = await getSalesCollection().insertOne(saleDocument, { session });
+
+        if (paymentConfig.paidNowAmount > 0) {
+            await getSalePaymentsCollection().insertOne(
+                buildPaymentRecord({
+                    sale: { ...saleDocument, _id: result.insertedId },
+                    amount: paymentConfig.paidNowAmount,
+                    paymentType: PAYMENT_TYPE.INITIAL,
+                    method: paymentConfig.paymentMethod,
+                    note: paymentConfig.paymentNote,
+                    actor,
+                    createdAt: now,
+                }),
+                { session }
+            );
+        }
+
         await session.commitTransaction();
         return getSaleById(result.insertedId.toString());
     } catch (error) {
@@ -239,10 +456,33 @@ async function createSale(payload) {
 
     await deductStocks(finalizedLineItems);
 
+    let insertedSaleId = null;
+
     try {
         const result = await getSalesCollection().insertOne(saleDocument);
-        return getSaleById(result.insertedId.toString());
+        insertedSaleId = result.insertedId;
+
+        if (paymentConfig.paidNowAmount > 0) {
+            await getSalePaymentsCollection().insertOne(
+                buildPaymentRecord({
+                    sale: { ...saleDocument, _id: insertedSaleId },
+                    amount: paymentConfig.paidNowAmount,
+                    paymentType: PAYMENT_TYPE.INITIAL,
+                    method: paymentConfig.paymentMethod,
+                    note: paymentConfig.paymentNote,
+                    actor,
+                    createdAt: now,
+                })
+            );
+        }
+
+        return getSaleById(insertedSaleId.toString());
     } catch (error) {
+        if (insertedSaleId) {
+            await getSalesCollection().deleteOne({ _id: insertedSaleId });
+            await getSalePaymentsCollection().deleteMany({ sale_id: insertedSaleId });
+        }
+
         await restoreStocks(finalizedLineItems);
         throw error;
     }
@@ -268,19 +508,113 @@ async function listSales(filters = {}) {
         query.invoice_number = { $regex: String(filters.invoice_number).trim(), $options: "i" };
     }
 
-    return getSalesCollection().find(query).sort({ created_at: -1 }).toArray();
+    if (filters.payment_status) {
+        query.payment_status = String(filters.payment_status).trim();
+    }
+
+    if (String(filters.has_due || "").trim().toLowerCase() === "true") {
+        query.due_amount = { $gt: 0 };
+    }
+
+    const sales = await getSalesCollection().find(query).sort({ created_at: -1 }).toArray();
+    return sales.map((sale) => normalizeSalePaymentFields(sale));
 }
 
 async function getSaleById(id) {
-    const sale = await getSalesCollection().findOne({ _id: productService.toObjectId(id) });
+    const [sale, payments] = await Promise.all([getSaleByIdRaw(id), listSalePaymentsInternal(id)]);
+    return {
+        ...normalizeSalePaymentFields(sale),
+        payments,
+    };
+}
 
-    if (!sale) {
-        const error = new Error("Sale not found");
-        error.statusCode = 404;
-        throw error;
+async function listSalePayments(saleId) {
+    await getSaleByIdRaw(saleId);
+    return listSalePaymentsInternal(saleId);
+}
+
+async function recordSalePayment(saleId, payload = {}, actor = null) {
+    const sale = normalizeSalePaymentFields(await getSaleByIdRaw(saleId));
+
+    if (sale.payment_status === PAYMENT_STATUS.PAID) {
+        throw buildValidationError("This invoice is already fully paid");
     }
 
-    return sale;
+    const amount = roundMoney(payload.amount);
+
+    if (amount <= 0) {
+        throw buildValidationError("Payment amount must be greater than zero");
+    }
+
+    if (amount > sale.due_amount) {
+        throw buildValidationError("Payment amount cannot exceed the remaining due");
+    }
+
+    const now = new Date();
+    const updatedSummary = buildSalePaymentSummary({
+        totalAmount: sale.total_amount,
+        returnedAmount: sale.return_summary?.returned_amount || 0,
+        paidAmount: roundMoney((sale.paid_amount || 0) + amount),
+        lastPaymentAt: now,
+    });
+    const paymentRecord = buildPaymentRecord({
+        sale,
+        amount,
+        paymentType: PAYMENT_TYPE.SETTLEMENT,
+        method: payload.method,
+        note: payload.note,
+        actor,
+        createdAt: now,
+    });
+    const client = getClient();
+    const session = client.startSession();
+
+    try {
+        session.startTransaction();
+        await getSalePaymentsCollection().insertOne(paymentRecord, { session });
+        await getSalesCollection().updateOne(
+            { _id: sale._id },
+            {
+                $set: {
+                    ...updatedSummary,
+                    updated_at: now,
+                },
+            },
+            { session }
+        );
+        await session.commitTransaction();
+        return getSaleById(saleId);
+    } catch (error) {
+        await session.abortTransaction();
+        if (!isTransactionUnsupportedError(error)) {
+            throw error;
+        }
+    } finally {
+        await session.endSession();
+    }
+
+    let insertedPaymentId = null;
+
+    try {
+        const insertResult = await getSalePaymentsCollection().insertOne(paymentRecord);
+        insertedPaymentId = insertResult.insertedId;
+        await getSalesCollection().updateOne(
+            { _id: sale._id },
+            {
+                $set: {
+                    ...updatedSummary,
+                    updated_at: now,
+                },
+            }
+        );
+        return getSaleById(saleId);
+    } catch (error) {
+        if (insertedPaymentId) {
+            await getSalePaymentsCollection().deleteOne({ _id: insertedPaymentId });
+        }
+
+        throw error;
+    }
 }
 
 async function getCompanyDueSummary(filters = {}) {
@@ -370,6 +704,9 @@ async function getCompanyDueSummary(filters = {}) {
                 channel: 1,
                 total_company_commission: 1,
                 total_amount: 1,
+                payment_status: 1,
+                paid_amount: 1,
+                due_amount: 1,
             })
             .sort({ created_at: -1 })
             .limit(10)
@@ -435,17 +772,26 @@ async function getCompanyDueSummary(filters = {}) {
                 company_commission_per_piece: roundMoney(item.company_commission_per_piece || 0),
             };
         }),
-        recent_sales: recentSales.map((sale) => ({
-            ...sale,
-            total_company_commission: roundMoney(sale.total_company_commission || 0),
-            total_amount: roundMoney(sale.total_amount || 0),
-        })),
+        recent_sales: recentSales.map((sale) => {
+            const normalizedSale = normalizeSalePaymentFields(sale);
+
+            return {
+                ...normalizedSale,
+                total_company_commission: roundMoney(sale.total_company_commission || 0),
+                total_amount: roundMoney(sale.total_amount || 0),
+            };
+        }),
     };
 }
 
 module.exports = {
+    PAYMENT_STATUS,
+    buildSalePaymentSummary,
+    normalizeSalePaymentFields,
     createSale,
     listSales,
     getSaleById,
+    listSalePayments,
+    recordSalePayment,
     getCompanyDueSummary,
 };

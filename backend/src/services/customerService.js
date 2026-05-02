@@ -1,6 +1,7 @@
 const { ObjectId } = require("mongodb");
 const { getCollection } = require("../db/mongo");
 const { WALK_IN_CUSTOMER_TAG } = require("../constants/systemCustomers");
+const { roundMoney } = require("../utils/money");
 
 const COLLECTION_NAME = "customers";
 
@@ -51,11 +52,40 @@ function handleMongoError(error) {
 
 async function listCustomersWithOptions(options = {}) {
     const query = options.includeSystem ? {} : { is_system: { $ne: true } };
-
-    return getCustomerCollection()
+    const customers = await getCustomerCollection()
         .find(query)
         .sort({ created_at: -1 })
         .toArray();
+
+    if (customers.length === 0) {
+        return [];
+    }
+
+    const customerIds = customers.map((customer) => customer._id);
+    const dueSummaries = await getCollection("sales")
+        .aggregate([
+            {
+                $match: {
+                    customer_id: { $in: customerIds },
+                    due_amount: { $gt: 0 },
+                },
+            },
+            {
+                $group: {
+                    _id: "$customer_id",
+                    total_due_amount: { $sum: "$due_amount" },
+                },
+            },
+        ])
+        .toArray();
+    const dueByCustomerId = new Map(
+        dueSummaries.map((row) => [String(row._id), roundMoney(row.total_due_amount || 0)])
+    );
+
+    return customers.map((customer) => ({
+        ...customer,
+        total_due_amount: dueByCustomerId.get(String(customer._id)) || 0,
+    }));
 }
 
 async function getCustomerById(id, options = {}) {

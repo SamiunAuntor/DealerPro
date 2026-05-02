@@ -1,6 +1,7 @@
 const { getCollection, getClient } = require("../db/mongo");
 const customerService = require("./customerService");
 const productService = require("./productService");
+const { buildSalePaymentSummary } = require("./salesService");
 const { validateUnitType, convertToPieces } = require("../utils/unitConversion");
 const { roundMoney } = require("../utils/money");
 const { generateReturnNumber } = require("../utils/invoiceNumberService");
@@ -321,10 +322,18 @@ function buildUpdatedSaleState(sale, returnLineItems) {
         ),
     };
 
+    const updatedPaymentSummary = buildSalePaymentSummary({
+        totalAmount: sale.total_amount,
+        returnedAmount: updatedReturnSummary.returned_amount,
+        paidAmount: sale.paid_amount ?? sale.total_amount ?? 0,
+        lastPaymentAt: sale.last_payment_at || null,
+    });
+
     return {
         items: updatedItems,
         return_status: deriveReturnStatus(updatedItems),
         return_summary: updatedReturnSummary,
+        ...updatedPaymentSummary,
     };
 }
 
@@ -423,6 +432,12 @@ async function createReturn(payload) {
                     items: updatedSaleState.items,
                     return_status: updatedSaleState.return_status,
                     return_summary: updatedSaleState.return_summary,
+                    payment_status: updatedSaleState.payment_status,
+                    collectible_amount: updatedSaleState.collectible_amount,
+                    paid_amount: updatedSaleState.paid_amount,
+                    due_amount: updatedSaleState.due_amount,
+                    refund_due_amount: updatedSaleState.refund_due_amount,
+                    last_payment_at: updatedSaleState.last_payment_at,
                     updated_at: now,
                 },
             },
@@ -452,6 +467,12 @@ async function createReturn(payload) {
                     items: updatedSaleState.items,
                     return_status: updatedSaleState.return_status,
                     return_summary: updatedSaleState.return_summary,
+                    payment_status: updatedSaleState.payment_status,
+                    collectible_amount: updatedSaleState.collectible_amount,
+                    paid_amount: updatedSaleState.paid_amount,
+                    due_amount: updatedSaleState.due_amount,
+                    refund_due_amount: updatedSaleState.refund_due_amount,
+                    last_payment_at: updatedSaleState.last_payment_at,
                     updated_at: now,
                 },
             }
@@ -470,6 +491,12 @@ async function createReturn(payload) {
                         items: sale.items,
                         return_status: sale.return_status,
                         return_summary: sale.return_summary,
+                        payment_status: sale.payment_status,
+                        collectible_amount: sale.collectible_amount,
+                        paid_amount: sale.paid_amount,
+                        due_amount: sale.due_amount,
+                        refund_due_amount: sale.refund_due_amount,
+                        last_payment_at: sale.last_payment_at,
                         updated_at: sale.updated_at || sale.created_at,
                     },
                 }

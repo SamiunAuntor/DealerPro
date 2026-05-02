@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PackagePlus, ShoppingCart, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -24,8 +24,12 @@ function POSPage() {
 
     const [selectedCustomerId, setSelectedCustomerId] = useState("");
     const [productToAddId, setProductToAddId] = useState("");
+    const [productSearchTerm, setProductSearchTerm] = useState("");
+    const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
     const [dealerDiscountAmount, setDealerDiscountAmount] = useState("");
     const [saleItems, setSaleItems] = useState([]);
+    const [paymentMode, setPaymentMode] = useState("");
+    const [paidNowAmount, setPaidNowAmount] = useState("");
 
     const customersQuery = useQuery({
         queryKey: ["customers", "all-options"],
@@ -54,6 +58,43 @@ function POSPage() {
         () => new Map((productsQuery.data || []).map((product) => [product._id, product])),
         [productsQuery.data]
     );
+    const productSelectorRef = useRef(null);
+    const filteredProductOptions = useMemo(() => {
+        const normalizedSearch = productSearchTerm.trim().toLowerCase();
+
+        if (!normalizedSearch) {
+            return productsQuery.data || [];
+        }
+
+        return (productsQuery.data || []).filter((product) => {
+            return (
+                String(product.code || "").toLowerCase().includes(normalizedSearch) ||
+                String(product.name || "").toLowerCase().includes(normalizedSearch)
+            );
+        });
+    }, [productSearchTerm, productsQuery.data]);
+    const selectedProductOptionLabel = useMemo(() => {
+        if (!productToAddId) {
+            return productSearchTerm;
+        }
+
+        const selectedProduct = productMap.get(productToAddId);
+        return selectedProduct ? `${selectedProduct.code} - ${selectedProduct.name}` : productSearchTerm;
+    }, [productMap, productSearchTerm, productToAddId]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!productSelectorRef.current?.contains(event.target)) {
+                setIsProductDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
 
     const effectiveSelectedCustomerId =
         preselectedCustomerId || selectedCustomerId || customersQuery.data?.walkInCustomer?._id || "";
@@ -199,6 +240,35 @@ function POSPage() {
         () => Number((totals.profitLoss || 0) - (previewItems.effectiveDealerDiscountAmount || 0)),
         [previewItems.effectiveDealerDiscountAmount, totals.profitLoss]
     );
+    const isAnonymousCustomer = Boolean(selectedCustomer?.is_system);
+    const hasPaymentModeSelected = isAnonymousCustomer || Boolean(paymentMode);
+    const effectivePaymentMode = isAnonymousCustomer ? "full" : paymentMode;
+    const effectivePaidNowAmount = useMemo(() => {
+        if (!effectivePaymentMode) {
+            return 0;
+        }
+
+        if (effectivePaymentMode === "unpaid") {
+            return 0;
+        }
+
+        if (effectivePaymentMode === "partial") {
+            return Math.min(
+                Math.max(Number(paidNowAmount || 0), 0),
+                Math.max(finalInvoiceAmount, 0)
+            );
+        }
+
+        return Math.max(finalInvoiceAmount, 0);
+    }, [effectivePaymentMode, finalInvoiceAmount, paidNowAmount]);
+    const dueAmount = useMemo(
+        () => Math.max(Number(finalInvoiceAmount || 0) - Number(effectivePaidNowAmount || 0), 0),
+        [effectivePaidNowAmount, finalInvoiceAmount]
+    );
+    const hasInvalidPaymentState =
+        !hasPaymentModeSelected ||
+        (effectivePaymentMode === "partial" &&
+            (effectivePaidNowAmount <= 0 || effectivePaidNowAmount >= finalInvoiceAmount));
 
     const hasInvalidSaleState = previewItems.items.some(
         (item) =>
@@ -218,6 +288,10 @@ function POSPage() {
             setSaleItems([]);
             setDealerDiscountAmount("");
             setProductToAddId("");
+            setProductSearchTerm("");
+            setIsProductDropdownOpen(false);
+            setPaymentMode("");
+            setPaidNowAmount("");
 
             if (!isCustomerLocked) {
                 setSelectedCustomerId("");
@@ -225,7 +299,7 @@ function POSPage() {
 
             Swal.fire(
                 "Success",
-                `Sale completed successfully. Invoice ${response.data.sale.invoice_number} created.`,
+                `Invoice ${response.data.sale.invoice_number} created with ${response.data.sale.payment_status.replaceAll("_", " ")} status.`,
                 "success"
             );
 
@@ -271,6 +345,8 @@ function POSPage() {
             },
         ]);
         setProductToAddId("");
+        setProductSearchTerm("");
+        setIsProductDropdownOpen(false);
     };
 
     const handleItemChange = (productId, field, value) => {
@@ -307,9 +383,22 @@ function POSPage() {
             return;
         }
 
+        if (hasInvalidPaymentState) {
+            Swal.fire(
+                "Error",
+                !hasPaymentModeSelected
+                    ? "Please choose a payment mode before completing the sale."
+                    : "Partial payment must be greater than zero and less than the final invoice amount.",
+                "error"
+            );
+            return;
+        }
+
         const result = await Swal.fire({
             title: "Confirm sale",
-            text: `Complete this sale for ${selectedCustomer?.name || "the selected customer"}?`,
+            text: `Create invoice for ${selectedCustomer?.name || "the selected customer"} with paid ${formatCurrency(
+                effectivePaidNowAmount
+            )} and due ${formatCurrency(dueAmount)}?`,
             icon: "question",
             showCancelButton: true,
             confirmButtonColor: "#111827",
@@ -326,6 +415,9 @@ function POSPage() {
             customer_id: effectiveSelectedCustomerId,
             channel,
             dealer_discount_amount: previewItems.effectiveDealerDiscountAmount,
+            payment_mode: effectivePaymentMode,
+            paid_now_amount: effectivePaidNowAmount,
+            payment_method: "cash",
             items: saleItems.map((item) => ({
                 product_id: item.product_id,
                 quantity: Number(item.quantity),
@@ -346,82 +438,218 @@ function POSPage() {
                 </div>
 
                 <div className="space-y-4">
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_repeat(5,minmax(0,0.7fr))]">
-                            <div>
-                                <label className="mb-2 block text-left text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                    Customer
-                                </label>
-                                <select
-                                    className="w-full rounded border border-gray-200 bg-white p-2.5 text-left text-sm font-semibold outline-none focus:border-[#3cc720] disabled:bg-gray-100"
-                                    disabled={isCustomerLocked}
-                                    onChange={(event) => setSelectedCustomerId(event.target.value)}
-                                    value={effectiveSelectedCustomerId}
-                                >
-                                    <option value="">Select customer</option>
-                                    {customersQuery.data?.walkInCustomer && (
-                                        <option value={customersQuery.data.walkInCustomer._id}>
-                                            {customersQuery.data.walkInCustomer.name}
-                                        </option>
-                                    )}
-                                    {(customersQuery.data?.customers || []).map((customer) => (
-                                        <option key={customer._id} value={customer._id}>
-                                            {customer.name} - {customer.phone}
-                                        </option>
-                                    ))}
-                                </select>
+                    <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 via-white to-gray-50 p-3 shadow-sm">
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.45fr)]">
+                            <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
+                                    Customer & Payment
+                                </p>
+
+                                <div className="mt-3 space-y-3">
+                                    <div>
+                                        <label className="mb-2 block text-left text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                            Customer
+                                        </label>
+                                        <select
+                                            className="w-full rounded-lg border border-gray-200 bg-white p-2.5 text-left text-sm font-semibold outline-none focus:border-[#3cc720] disabled:bg-gray-100"
+                                            disabled={isCustomerLocked}
+                                            onChange={(event) => setSelectedCustomerId(event.target.value)}
+                                            value={effectiveSelectedCustomerId}
+                                        >
+                                            <option value="">Select customer</option>
+                                            {customersQuery.data?.walkInCustomer && (
+                                                <option value={customersQuery.data.walkInCustomer._id}>
+                                                    {customersQuery.data.walkInCustomer.name}
+                                                </option>
+                                            )}
+                                            {(customersQuery.data?.customers || []).map((customer) => (
+                                                <option key={customer._id} value={customer._id}>
+                                                    {customer.name} - {customer.phone}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                            Selected Customer
+                                        </p>
+                                        <p className="mt-2 text-base font-bold leading-snug text-gray-900">
+                                            {getDisplayCustomerName(selectedCustomer)}
+                                        </p>
+                                        <p className="mt-1 text-xs font-medium text-gray-500">
+                                            {getDisplayCustomerPhone(selectedCustomer)}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 p-3">
+                                        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
+                                            <div>
+                                                <label className="mb-2 block text-left text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                    Payment Mode
+                                                </label>
+                                                <select
+                                                    className="w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm font-semibold outline-none focus:border-[#3cc720] disabled:bg-gray-100"
+                                                    disabled={isAnonymousCustomer}
+                                                    onChange={(event) => setPaymentMode(event.target.value)}
+                                                    value={effectivePaymentMode}
+                                                >
+                                                    <option value="" disabled>
+                                                        Select payment mode
+                                                    </option>
+                                                    <option value="full">Full Paid</option>
+                                                    <option value="partial">Partial Paid</option>
+                                                    <option value="unpaid">Unpaid</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="mb-2 block text-left text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                    Paid Now
+                                                </label>
+                                                <input
+                                                    className="w-full rounded-lg border border-gray-200 bg-white p-2.5 text-sm font-semibold outline-none placeholder:font-medium placeholder:text-gray-400 focus:border-[#3cc720] disabled:bg-gray-100"
+                                                    disabled={!effectivePaymentMode || effectivePaymentMode !== "partial"}
+                                                    min="0"
+                                                    onChange={(event) => setPaidNowAmount(event.target.value)}
+                                                    placeholder="Enter paid amount"
+                                                    type="number"
+                                                    value={
+                                                        effectivePaymentMode === "partial"
+                                                            ? paidNowAmount
+                                                            : effectivePaidNowAmount
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {isAnonymousCustomer && (
+                                            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-600">
+                                                Anonymous walk-in invoices must be fully paid.
+                                            </p>
+                                        )}
+                                        {effectivePaymentMode === "partial" && hasInvalidPaymentState && (
+                                            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-red-500">
+                                                Partial payment must stay between 0 and the final invoice amount.
+                                            </p>
+                                        )}
+                                        {!hasPaymentModeSelected && !isAnonymousCustomer && (
+                                            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.18em] text-red-500">
+                                                Payment mode selection is required.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                    Selected Customer
-                                </p>
-                                <p className="mt-2 text-sm font-semibold text-gray-900">
-                                    {getDisplayCustomerName(selectedCustomer)}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                    {getDisplayCustomerPhone(selectedCustomer)}
-                                </p>
-                            </div>
+                            <div className="space-y-3">
+                                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                    <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                            Gross Amount
+                                        </p>
+                                        <p className="mt-2 text-xl font-black text-gray-900">
+                                            {formatCurrency(totals.grossAmount)}
+                                        </p>
+                                    </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                    Gross Amount
-                                </p>
-                                <p className="mt-2 text-lg font-semibold text-gray-900">
-                                    {formatCurrency(totals.grossAmount)}
-                                </p>
-                            </div>
+                                    <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                            Company Discount
+                                        </p>
+                                        <p className="mt-2 text-xl font-black text-gray-900">
+                                            {formatCurrency(totals.companyDiscountAmount)}
+                                        </p>
+                                    </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                    Company Discount
-                                </p>
-                                <p className="mt-2 text-lg font-semibold text-gray-900">
-                                    {formatCurrency(totals.companyDiscountAmount)}
-                                </p>
-                            </div>
+                                    <div className="rounded-xl border border-gray-900 bg-[#111827] p-3 text-white shadow-sm sm:col-span-2 xl:col-span-1">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-300">
+                                            Final Amount
+                                        </p>
+                                        <p className="mt-2 text-2xl font-black text-white">
+                                            {formatCurrency(finalInvoiceAmount)}
+                                        </p>
+                                    </div>
+                                </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                    Final Amount
-                                </p>
-                                <p className="mt-2 text-xl font-black text-gray-900">
-                                    {formatCurrency(finalInvoiceAmount)}
-                                </p>
-                            </div>
+                                <div className="grid gap-3 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 shadow-sm">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                                                Paid Now
+                                            </p>
+                                            <p className="mt-2 text-xl font-black text-emerald-700">
+                                                {formatCurrency(effectivePaidNowAmount)}
+                                            </p>
+                                        </div>
 
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
-                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                    Profit / Loss
-                                </p>
-                                <p
-                                    className={`mt-2 text-lg font-black ${
-                                        finalProfitLoss < 0 ? "text-red-600" : "text-emerald-600"
-                                    }`}
-                                >
-                                    {formatCurrency(finalProfitLoss)}
-                                </p>
+                                        <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 shadow-sm">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-amber-600">
+                                                Due Later
+                                            </p>
+                                            <p className="mt-2 text-xl font-black text-amber-700">
+                                                {formatCurrency(dueAmount)}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:col-span-2">
+                                            <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                Profit / Loss
+                                            </p>
+                                            <p
+                                                className={`mt-2 text-xl font-black ${
+                                                    finalProfitLoss < 0 ? "text-red-600" : "text-emerald-600"
+                                                }`}
+                                            >
+                                                {formatCurrency(finalProfitLoss)}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">
+                                            Payment Snapshot
+                                        </p>
+                                        <div className="mt-3 space-y-3">
+                                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                    Selected Mode
+                                                </p>
+                                                <p className="mt-1 text-sm font-black text-gray-900">
+                                                    {effectivePaymentMode
+                                                        ? effectivePaymentMode === "full"
+                                                            ? "Full Paid"
+                                                            : effectivePaymentMode === "partial"
+                                                              ? "Partial Paid"
+                                                              : "Unpaid"
+                                                        : "Not Selected"}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                    Invoice Split
+                                                </p>
+                                                <p className="mt-1 text-sm font-semibold text-gray-700">
+                                                    {effectivePaidNowAmount > 0 && dueAmount > 0
+                                                        ? "Part collected now, remaining due later."
+                                                        : dueAmount > 0
+                                                          ? "No cash collected yet for this invoice."
+                                                          : "This invoice will be settled immediately."}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                                <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                    Customer Rule
+                                                </p>
+                                                <p className="mt-1 text-sm font-semibold text-gray-700">
+                                                    {isAnonymousCustomer
+                                                        ? "Anonymous walk-in invoices must be fully paid."
+                                                        : "Named customers can be fully paid, partial, or unpaid."}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -434,18 +662,58 @@ function POSPage() {
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                            <select
-                                className="w-full rounded border border-gray-200 bg-gray-50 p-2.5 text-sm font-semibold outline-none focus:border-[#3cc720]"
-                                onChange={(event) => setProductToAddId(event.target.value)}
-                                value={productToAddId}
-                            >
-                                <option value="">Select product to add</option>
-                                {(productsQuery.data || []).map((product) => (
-                                    <option key={product._id} value={product._id}>
-                                        {product.code} - {product.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="relative" ref={productSelectorRef}>
+                                <input
+                                    className="w-full rounded border border-gray-200 bg-gray-50 p-2.5 text-sm font-semibold outline-none placeholder:font-medium placeholder:text-gray-400 focus:border-[#3cc720]"
+                                    onClick={() => setIsProductDropdownOpen(true)}
+                                    onChange={(event) => {
+                                        const nextValue = event.target.value;
+                                        setProductSearchTerm(nextValue);
+                                        setIsProductDropdownOpen(true);
+
+                                        const matchedProduct = (productsQuery.data || []).find(
+                                            (product) =>
+                                                `${product.code} - ${product.name}`.toLowerCase() ===
+                                                nextValue.trim().toLowerCase()
+                                        );
+
+                                        setProductToAddId(matchedProduct?._id || "");
+                                    }}
+                                    onFocus={() => setIsProductDropdownOpen(true)}
+                                    placeholder="Type product code or name to search..."
+                                    value={selectedProductOptionLabel}
+                                />
+                                {isProductDropdownOpen && (
+                                    <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                        {filteredProductOptions.length === 0 && (
+                                            <div className="px-3 py-2 text-sm text-gray-500">
+                                                No matching products found.
+                                            </div>
+                                        )}
+                                        {filteredProductOptions.map((product) => {
+                                            const optionLabel = `${product.code} - ${product.name}`;
+                                            const isSelected = productToAddId === product._id;
+
+                                            return (
+                                                <button
+                                                    key={product._id}
+                                                    className={`block w-full px-3 py-2 text-left text-sm font-semibold transition hover:bg-gray-50 ${
+                                                        isSelected ? "bg-[#3cc720]/10 text-gray-900" : "text-gray-700"
+                                                    }`}
+                                                    onClick={() => {
+                                                        setProductToAddId(product._id);
+                                                        setProductSearchTerm(optionLabel);
+                                                        setIsProductDropdownOpen(false);
+                                                    }}
+                                                    type="button"
+                                                >
+                                                    {optionLabel}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 className="flex items-center justify-center gap-2 rounded bg-slate-800 px-4 py-2.5 text-xs font-bold uppercase text-white transition-all hover:bg-slate-900"
                                 onClick={handleAddProduct}
@@ -455,6 +723,12 @@ function POSPage() {
                                 Add Product
                             </button>
                         </div>
+                        {productSearchTerm.trim() && !productToAddId && (
+                            <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                Showing {filteredProductOptions.length} matching product
+                                {filteredProductOptions.length === 1 ? "" : "s"}.
+                            </p>
+                        )}
 
                         <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200">
                             <table className="min-w-[1080px] w-full table-fixed border-collapse text-left">
@@ -640,7 +914,11 @@ function POSPage() {
 
                             <button
                                 className="flex items-center justify-center gap-2 rounded bg-[#111827] px-6 py-3 text-xs font-black uppercase tracking-wider text-[#3cc720] shadow-lg transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={createSaleMutation.isPending || hasInvalidSaleState}
+                                disabled={
+                                    createSaleMutation.isPending ||
+                                    hasInvalidSaleState ||
+                                    hasInvalidPaymentState
+                                }
                                 onClick={handleSubmitSale}
                                 type="button"
                             >

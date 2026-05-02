@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAuth } from "../Contexts/AuthContext";
@@ -6,8 +7,9 @@ import { useAuth } from "../Contexts/AuthContext";
 function LoginPage() {
     const navigate = useNavigate();
     const { isAuthenticated, isAuthLoading, login } = useAuth();
-    const [email, setEmail] = useState("");
+    const [email, setEmail] = useState("admin@gmail.com");
     const [password, setPassword] = useState("");
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isAuthLoading && isAuthenticated) {
@@ -74,13 +76,22 @@ function LoginPage() {
                         <label className="text-[10px] font-black uppercase tracking-wider text-gray-400">
                             Password
                         </label>
-                        <input
-                            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#3cc720]"
-                            onChange={(event) => setPassword(event.target.value)}
-                            placeholder="Enter password"
-                            type="password"
-                            value={password}
-                        />
+                        <div className="relative">
+                            <input
+                                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 pr-12 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#3cc720]"
+                                onChange={(event) => setPassword(event.target.value)}
+                                placeholder="Enter password"
+                                type={isPasswordVisible ? "text" : "password"}
+                                value={password}
+                            />
+                            <button
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-700"
+                                onClick={() => setIsPasswordVisible((prev) => !prev)}
+                                type="button"
+                            >
+                                {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
                     </div>
 
                     <button

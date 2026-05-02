@@ -14,7 +14,7 @@ function sendErrorResponse(res, error, fallbackMessage) {
 
 async function createSale(req, res) {
     try {
-        const sale = await salesService.createSale(req.body);
+        const sale = await salesService.createSale(req.body, req.user);
         return res.status(201).json({
             message: "Sale created successfully",
             sale,
@@ -39,6 +39,27 @@ async function getSale(req, res) {
         return res.json(sale);
     } catch (error) {
         return sendErrorResponse(res, error, "Failed to fetch sale");
+    }
+}
+
+async function getSalePayments(req, res) {
+    try {
+        const payments = await salesService.listSalePayments(req.params.id);
+        return res.json(payments);
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to fetch sale payments");
+    }
+}
+
+async function createSalePayment(req, res) {
+    try {
+        const sale = await salesService.recordSalePayment(req.params.id, req.body, req.user);
+        return res.status(201).json({
+            message: "Payment recorded successfully",
+            sale,
+        });
+    } catch (error) {
+        return sendErrorResponse(res, error, "Failed to record sale payment");
     }
 }
 
@@ -85,6 +106,8 @@ module.exports = {
     createSale,
     getSales,
     getSale,
+    getSalePayments,
+    createSalePayment,
     getCompanyDueSummary,
     getCompanyDueSettlements,
     createCompanyDueSettlement,

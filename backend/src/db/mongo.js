@@ -15,6 +15,7 @@ const {
     AUTH_SINGLETON_EMAIL_FALLBACK,
 } = require("../constants/auth");
 const { hashPassword } = require("../utils/password");
+const { roundMoney } = require("../utils/money");
 
 const client = new MongoClient(process.env.MONGO_URI);
 let db;
@@ -27,6 +28,7 @@ async function connectDB() {
         await ensureWalkInCustomer();
         await ensureDealerValuation();
         await ensureAdminUser();
+        await backfillSalesPaymentState();
         console.log("MongoDB connected to DealerPro DB");
     } catch (error) {
         console.error("MongoDB connection failed:", error.message);
@@ -41,9 +43,13 @@ async function ensureIndexes() {
     await db.collection("sales").createIndex({ invoice_number: 1 }, { unique: true });
     await db.collection("sales").createIndex({ customer_id: 1, created_at: -1 });
     await db.collection("sales").createIndex({ channel: 1, created_at: -1 });
+    await db.collection("sales").createIndex({ payment_status: 1, created_at: -1 });
+    await db.collection("sales").createIndex({ customer_id: 1, due_amount: -1 });
     await db.collection("returns").createIndex({ return_number: 1 }, { unique: true });
     await db.collection("returns").createIndex({ original_sale_id: 1, created_at: -1 });
     await db.collection("returns").createIndex({ customer_id: 1, created_at: -1 });
+    await db.collection("sale_payments").createIndex({ sale_id: 1, created_at: -1 });
+    await db.collection("sale_payments").createIndex({ customer_id: 1, created_at: -1 });
     await db.collection("company_due_settlements").createIndex({ settled_at: -1 });
     await db.collection("company_due_settlements").createIndex({ cutoff_sale_id: 1 });
     await db.collection(AUTH_COLLECTION_NAME).createIndex({ email: 1 }, { unique: true });
@@ -143,6 +149,76 @@ async function ensureAdminUser() {
         created_at: now,
         updated_at: now,
     });
+}
+
+function buildLegacyPaymentSummary(sale) {
+    const totalAmount = Math.max(roundMoney(sale.total_amount || 0), 0);
+    const returnedAmount = Math.max(roundMoney(sale.return_summary?.returned_amount || 0), 0);
+    const collectibleAmount = Math.max(roundMoney(totalAmount - returnedAmount), 0);
+    const paidAmount =
+        sale.paid_amount !== undefined && sale.paid_amount !== null
+            ? Math.max(roundMoney(sale.paid_amount), 0)
+            : totalAmount;
+    const dueAmount = Math.max(roundMoney(collectibleAmount - paidAmount), 0);
+    const refundDueAmount = Math.max(roundMoney(paidAmount - collectibleAmount), 0);
+
+    let paymentStatus = "paid";
+
+    if (dueAmount > 0 && paidAmount <= 0) {
+        paymentStatus = "unpaid";
+    } else if (dueAmount > 0) {
+        paymentStatus = "partially_paid";
+    }
+
+    return {
+        payment_status: paymentStatus,
+        collectible_amount: collectibleAmount,
+        paid_amount: paidAmount,
+        applied_paid_amount: Math.min(paidAmount, collectibleAmount),
+        due_amount: dueAmount,
+        refund_due_amount: refundDueAmount,
+        last_payment_at:
+            sale.last_payment_at ||
+            (paidAmount > 0 ? sale.updated_at || sale.created_at || new Date() : null),
+    };
+}
+
+async function backfillSalesPaymentState() {
+    const salesCollection = db.collection("sales");
+    const salesNeedingBackfill = await salesCollection
+        .find({
+            $or: [
+                { payment_status: { $exists: false } },
+                { paid_amount: { $exists: false } },
+                { due_amount: { $exists: false } },
+                { collectible_amount: { $exists: false } },
+                { refund_due_amount: { $exists: false } },
+            ],
+        })
+        .project({
+            total_amount: 1,
+            return_summary: 1,
+            paid_amount: 1,
+            last_payment_at: 1,
+            updated_at: 1,
+            created_at: 1,
+        })
+        .toArray();
+
+    if (salesNeedingBackfill.length === 0) {
+        return;
+    }
+
+    await Promise.all(
+        salesNeedingBackfill.map((sale) =>
+            salesCollection.updateOne(
+                { _id: sale._id },
+                {
+                    $set: buildLegacyPaymentSummary(sale),
+                }
+            )
+        )
+    );
 }
 
 function getDB() {

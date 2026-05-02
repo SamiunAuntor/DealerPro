@@ -20,6 +20,16 @@ function formatDateTime(value) {
     });
 }
 
+function formatCurrency(value) {
+    return new Intl.NumberFormat("en-BD", {
+        style: "currency",
+        currency: "BDT",
+        minimumFractionDigits: 2,
+    })
+        .format(Number(value || 0))
+        .replace("BDT", "Tk");
+}
+
 function CustomersPage() {
     const axios = useAxios();
     const navigate = useNavigate();
@@ -135,11 +145,12 @@ function CustomersPage() {
 
             <div className="flex-1 overflow-hidden rounded border border-gray-200">
                 <div className="h-full overflow-x-auto">
-                    <table className="min-w-[880px] w-full table-fixed border-collapse text-left lg:min-w-full">
+                    <table className="min-w-[1040px] w-full table-fixed border-collapse text-left lg:min-w-full">
                         <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-100">
                             <tr className="divide-x divide-gray-200">
-                                <th className="w-[200px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Name</th>
-                                <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Phone</th>
+                                <th className="w-[220px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Name</th>
+                                <th className="w-[170px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Phone</th>
+                                <th className="w-[150px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Total Due</th>
                                 <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Created</th>
                                 <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Updated</th>
                                 <th className="w-[160px] px-3 py-2 text-center text-[10px] font-bold uppercase text-gray-600">Actions</th>
@@ -148,21 +159,21 @@ function CustomersPage() {
                         <tbody className="divide-y divide-gray-200">
                             {customersQuery.isLoading && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={5}>
+                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
                                         Loading customers...
                                     </td>
                                 </tr>
                             )}
                             {customersQuery.isError && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-red-500" colSpan={5}>
+                                    <td className="px-3 py-8 text-center text-sm text-red-500" colSpan={6}>
                                         Failed to load customers.
                                     </td>
                                 </tr>
                             )}
                             {!customersQuery.isLoading && !customersQuery.isError && filteredCustomers.length === 0 && (
                                 <tr>
-                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={5}>
+                                    <td className="px-3 py-8 text-center text-sm text-gray-500" colSpan={6}>
                                         No customers found.
                                     </td>
                                 </tr>
@@ -171,6 +182,9 @@ function CustomersPage() {
                                 <tr key={customer._id} className="divide-x divide-gray-200 transition-colors hover:bg-gray-100">
                                     <td className="px-3 py-2 text-center text-sm font-semibold text-gray-800">{customer.name}</td>
                                     <td className="px-3 py-2 text-center text-sm font-medium text-gray-600">{customer.phone}</td>
+                                    <td className="px-3 py-2 text-center text-sm font-semibold text-amber-700">
+                                        {formatCurrency(customer.total_due_amount || 0)}
+                                    </td>
                                     <td className="px-3 py-2 text-center text-xs text-gray-500">{formatDateTime(customer.created_at)}</td>
                                     <td className="px-3 py-2 text-center text-xs text-gray-500">{formatDateTime(customer.updated_at)}</td>
                                     <td className="px-3 py-2">
