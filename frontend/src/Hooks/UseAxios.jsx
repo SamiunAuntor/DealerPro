@@ -3,6 +3,7 @@ import axios from "axios";
 // create instance
 const axiosInstance = axios.create({
     baseURL: "http://localhost:5000",
+    withCredentials: true,
 });
 
 const useAxios = () => {

@@ -8,7 +8,13 @@ const {
     DEALER_VALUATION_COLLECTION,
     DEALER_VALUATION_SINGLETON_KEY,
     DEALER_OPENING_VALUATION_BDT,
+    DEALER_OPENING_VALUATION_ENV_NAME,
 } = require("../constants/dealerValuation");
+const {
+    AUTH_COLLECTION_NAME,
+    AUTH_SINGLETON_EMAIL_FALLBACK,
+} = require("../constants/auth");
+const { hashPassword } = require("../utils/password");
 
 const client = new MongoClient(process.env.MONGO_URI);
 let db;
@@ -20,6 +26,7 @@ async function connectDB() {
         await ensureIndexes();
         await ensureWalkInCustomer();
         await ensureDealerValuation();
+        await ensureAdminUser();
         console.log("MongoDB connected to DealerPro DB");
     } catch (error) {
         console.error("MongoDB connection failed:", error.message);
@@ -39,6 +46,7 @@ async function ensureIndexes() {
     await db.collection("returns").createIndex({ customer_id: 1, created_at: -1 });
     await db.collection("company_due_settlements").createIndex({ settled_at: -1 });
     await db.collection("company_due_settlements").createIndex({ cutoff_sale_id: 1 });
+    await db.collection(AUTH_COLLECTION_NAME).createIndex({ email: 1 }, { unique: true });
     await db
         .collection(DEALER_VALUATION_COLLECTION)
         .createIndex({ singleton_key: 1 }, { unique: true });
@@ -86,13 +94,52 @@ async function ensureDealerValuation() {
     }
 
     const now = new Date();
+    const configuredOpeningAmount = Number(process.env[DEALER_OPENING_VALUATION_ENV_NAME]);
+    const openingValuationAmount =
+        Number.isFinite(configuredOpeningAmount) && configuredOpeningAmount >= 0
+            ? configuredOpeningAmount
+            : DEALER_OPENING_VALUATION_BDT;
 
     await dealerValuationCollection.insertOne({
         singleton_key: DEALER_VALUATION_SINGLETON_KEY,
-        opening_valuation_amount: DEALER_OPENING_VALUATION_BDT,
+        opening_valuation_amount: openingValuationAmount,
         currency: "BDT",
         is_locked: true,
         seeded_by_system: true,
+        created_at: now,
+        updated_at: now,
+    });
+}
+
+async function ensureAdminUser() {
+    const authCollection = db.collection(AUTH_COLLECTION_NAME);
+    const adminEmail = String(process.env.ADMIN_EMAIL || AUTH_SINGLETON_EMAIL_FALLBACK)
+        .trim()
+        .toLowerCase();
+    const adminPassword = String(process.env.ADMIN_PASSWORD || "");
+
+    if (!adminPassword) {
+        throw new Error("ADMIN_PASSWORD is required");
+    }
+
+    if (!String(process.env.JWT_SECRET || "").trim()) {
+        throw new Error("JWT_SECRET is required");
+    }
+
+    const existingAdmin = await authCollection.findOne({ email: adminEmail });
+
+    if (existingAdmin) {
+        return;
+    }
+
+    const now = new Date();
+
+    await authCollection.insertOne({
+        email: adminEmail,
+        password_hash: hashPassword(adminPassword),
+        role: "admin",
+        is_active: true,
+        is_seeded: true,
         created_at: now,
         updated_at: now,
     });

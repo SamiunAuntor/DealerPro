@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
     FileText,
     LayoutGrid,
+    LogOut,
     Menu,
     Package,
     ShoppingCart,
@@ -9,16 +10,19 @@ import {
     Wallet,
     X,
 } from "lucide-react";
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { Tooltip } from "react-tooltip";
 import "react-tooltip/dist/react-tooltip.css";
+import { useAuth } from "../Contexts/AuthContext";
 
 function MainLayout({ children }) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const navigate = useNavigate();
+    const { logout } = useAuth();
 
     const navItems = [
-        { name: "Home", icon: <LayoutGrid size={22} />, href: "/" },
+        { name: "Home", icon: <LayoutGrid size={22} />, href: "/dashboard" },
         { name: "Product Inventory", icon: <Package size={22} />, href: "/inventory" },
         { name: "Customer Directory", icon: <Users size={22} />, href: "/customers" },
         { name: "POS", icon: <ShoppingCart size={22} />, href: "/pos" },
@@ -63,6 +67,21 @@ function MainLayout({ children }) {
                         ))}
                     </nav>
 
+                    <div className="w-full px-2 pb-4">
+                        <button
+                            className="flex w-full items-center justify-center rounded-md py-3 text-gray-300 transition hover:bg-red-500/10 hover:text-red-400"
+                            data-tooltip-id="nav-tooltip"
+                            data-tooltip-content="Logout"
+                            onClick={async () => {
+                                await logout();
+                                navigate("/", { replace: true });
+                            }}
+                            type="button"
+                        >
+                            <LogOut size={22} />
+                        </button>
+                    </div>
+
                     <button className="p-4 text-gray-400 hover:text-white lg:hidden" onClick={() => setIsOpen(false)} type="button">
                         <X size={24} />
                     </button>
@@ -84,7 +103,7 @@ function MainLayout({ children }) {
                         </span>
                     </div>
 
-                    <div className="text-right">
+                    <div className="ml-auto text-right">
                         <p className="text-sm font-bold uppercase tracking-wider text-gray-800">
                             {currentTime.toLocaleTimeString("en-US", {
                                 hour: "2-digit",

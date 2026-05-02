@@ -20,7 +20,7 @@ const Error404Page = () => {
 
             {/* Action Button */}
             <Link
-                to="/"
+                to="/dashboard"
                 className="group flex items-center gap-2 bg-[#111827] text-white px-8 py-3 rounded-lg font-semibold text-sm transition-all hover:bg-gray-800 shadow-lg shadow-gray-200 active:scale-95"
             >
                 <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
